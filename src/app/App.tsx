@@ -7,6 +7,7 @@ import type { Absence, AvailabilityRule, Consultation } from "../features/calend
 import "../styles/calendar.css";
 import { consultationConflictsWithAbsence } from "../features/calendar/utils/conflicts";
 import { InfoModal } from "../features/calendar/components/InfoModal";
+import { Cart } from "../features/calendar/components/Cart";
 
 export default function App() {
   const doctorId = "d1";
@@ -21,6 +22,9 @@ export default function App() {
   const [availabilityRules, setAvailabilityRules] = useState<AvailabilityRule[]>([]);
   
   const [absences, setAbsences] = useState<Absence[]>([]);
+
+  const cartItems = consultations.filter(c => c.status === "draft");
+
 
   useEffect(() => {
     getConsultationsForDoctor(doctorId).then(setConsultations);
@@ -88,6 +92,23 @@ export default function App() {
     setAbsences(prev => prev.filter(a => a.id !== id));
   }
 
+  function handleRemoveFromCart(id: string) {
+    setConsultations(prev =>
+      prev.filter(c => c.id !== id)
+    );
+  }
+
+  function handleCheckout() {
+    setConsultations(prev =>
+      prev.map(c =>
+        c.status === "draft"
+          ? { ...c, status: "booked" }
+          : c
+      )
+    );
+  }
+
+
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 30_000);
     return () => clearInterval(t);
@@ -129,6 +150,11 @@ export default function App() {
         onRemoveAbsence={handleRemoveAbsence}
         absences={absences}
         
+      />
+      <Cart
+        items={cartItems}
+        onRemove={handleRemoveFromCart}
+        onCheckout={handleCheckout}
       />
     </div>
   );

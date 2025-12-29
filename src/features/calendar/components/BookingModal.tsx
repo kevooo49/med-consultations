@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { format } from "date-fns";
 import type { Consultation } from "../types";
+import { calculatePrice } from "../utils/pricing";
 
 export type ConsultationType =
   | "first_visit"
@@ -106,13 +107,18 @@ export function BookingModal({ day, startSlot, endSlot, onClose, onSave }: Props
     const safeType = type as Consultation["type"];
     const safeGender = gender as NonNullable<Consultation["patient"]>["gender"];
 
+    const durationMin = toMinutes - fromMinutes;
+    const price = calculatePrice(durationMin);
+
+
     const consultation: Consultation = {
       id: crypto.randomUUID(),
       doctorId: "d1", // na razie na sztywno
       start: from.toISOString(),
       end: to.toISOString(),
       type: safeType,
-      status: "booked",
+      status: "draft",
+      price,
       patient: {
         fullName,
         gender: safeGender,
@@ -238,7 +244,7 @@ export function BookingModal({ day, startSlot, endSlot, onClose, onSave }: Props
             Zamknij
           </button>
           <button className="btn primary" onClick={handleSubmit}>
-            Zarezerwuj
+            Dodaj do koszyka
           </button>
         </div>
       </div>

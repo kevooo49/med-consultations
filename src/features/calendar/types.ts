@@ -4,7 +4,7 @@ export type ConsultationType =
   | "chronic"
   | "prescription";
 
-export type ConsultationStatus = "free" | "booked" | "cancelled";
+export type ConsultationStatus = "free" | "booked" | "cancelled" | "draft";
 
 export interface PatientInfo {
   fullName: string;
@@ -22,6 +22,11 @@ export interface Consultation {
   patient?: PatientInfo;
   notes?: string;
   documents?: Array<{ name: string; url?: string }>;
+  price?: {
+    net: number;
+    vat: number;
+    gross: number;
+  };
 }
 
 export type TimeRange = {
