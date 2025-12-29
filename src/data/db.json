@@ -1,0 +1,31 @@
+{
+  "doctors": [
+    { "id": "d1", "name": "dr Anna Kowalska", "specialization": "kardiolog" }
+  ],
+  "consultations": [
+    {
+      "id": "c1",
+      "doctorId": "d1",
+      "start": "2025-12-29T08:00:00",
+      "end": "2025-12-29T10:00:00",
+      "type": "first_visit",
+      "status": "booked",
+      "patient": { "fullName": "Jan Nowak", "gender": "M", "age": 34 },
+      "notes": "Bóle w klatce piersiowej",
+      "documents": []
+    },
+    {
+      "id": "c2",
+      "doctorId": "d1",
+      "start": "2025-12-30T16:30:00",
+      "end": "2025-12-30T17:00:00",
+      "type": "control",
+      "status": "booked",
+      "patient": { "fullName": "Maria Wiśniewska", "gender": "F", "age": 58 },
+      "notes": "Kontrola po lekach",
+      "documents": []
+    }
+  ],
+  "availability": [],
+  "absences": []
+}

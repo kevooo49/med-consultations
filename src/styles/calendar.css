@@ -1,0 +1,261 @@
+.calendar {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 12px;
+  padding: 16px;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+}
+
+.calendarTopBar {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.calendarGrid {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: visible;
+  background: #fff;
+}
+
+.weekHeaderRow {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 80px repeat(7, 1fr);
+  border-bottom: 1px solid #e5e7eb;
+  background: #fff;
+  padding-right: 16px;
+}
+
+
+.dayHeader {
+  padding: 10px 8px;
+  font-size: 13px;
+  border-right: 1px solid #f0f0f0;
+}
+.dayHeader:last-child { border-right: none; }
+
+.todayHeader {
+  background: #eef6ff;
+}
+
+.calendarScroll {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  height: 720px; /* 6h */
+  overflow-y: auto;
+  border-radius: 12px;
+}
+
+.timeGutter {
+  position: relative;
+  background: #fafafa;
+  border-right: 1px solid #e5e7eb;
+}
+
+.bodyRow {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  position: relative;
+}
+
+.dayCol {
+  position: relative;
+  border-right: 1px solid #f0f0f0;
+}
+
+.dayCol::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 1px;
+  background: #e5e7eb;
+  pointer-events: none;
+}
+
+
+.dayCol:last-child { border-right: none; }
+
+.todayCol {
+  background: #f6fbff;
+}
+
+.slotLine {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #f3f4f6;
+}
+
+.eventBlock {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+  background: #e5e7eb;
+  z-index: 10;
+}
+
+.eventPast {
+  opacity: 0.45;
+  filter: grayscale(0.35);
+}
+
+.tooltip {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #111827;
+  color: white;
+  padding: 8px 10px;
+  border-radius: 10px;
+  width: 220px;
+  font-size: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+  z-index: 1000;
+  bottom: calc(100% + 8px);
+}
+
+.tooltipBelow {
+  bottom: auto;
+  top: calc(100% + 8px);
+}
+
+.nowLine {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #ef4444;
+  z-index: 40;
+}
+
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+.modal {
+  background: #fff;
+  width: 420px;
+  border-radius: 14px;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+}
+
+.modalHeader {
+  padding: 14px 16px;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modalClose {
+  border: none;
+  background: none;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.modalBody {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.modalBody label {
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.modalBody input,
+.modalBody textarea,
+.modalBody select {
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+}
+
+.modalFooter {
+  padding: 12px 16px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.btn.primary {
+  background: #2563eb;
+  color: white;
+}
+
+.btn.secondary {
+  background: #e5e7eb;
+}
+
+.error {
+  color: #dc2626;
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.slotBlock {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 60px;
+  border-bottom: 1px solid #f3f4f6;
+  box-sizing: border-box;
+}
+
+.slotUnavailable {
+  background: repeating-linear-gradient(
+    45deg,
+    #f0f0f0,
+    #f0f0f0 10px,
+    #e0e0e0 10px,
+    #e0e0e0 20px
+  );
+  cursor: not-allowed;
+}
+
+.slotBlock.slotAbsent {
+  background: repeating-linear-gradient(
+    45deg,
+    #f0f0f0,
+    #f0f0f0 10px,
+    #BF5445 10px,
+    #BF5445 20px
+  ) !important;
+  cursor: not-allowed;
+}
+
+.eventCancelled {
+  opacity: 0.7;
+  filter: grayscale(0.6);
+  text-decoration: line-through;
+  background: #f3f4f6 !important;
+}
