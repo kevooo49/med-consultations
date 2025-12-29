@@ -30,14 +30,18 @@ export default function App() {
     setConsultations(prev => [...prev, c]);
   }
 
+  // function handleCancelConsultation(id: string) {
+  //   setConsultations(prev =>
+  //     prev.map(c =>
+  //       c.id === id
+  //         ? { ...c, status: "cancelled" }
+  //         : c
+  //     )
+  //   );
+  // }
+
   function handleCancelConsultation(id: string) {
-    setConsultations(prev =>
-      prev.map(c =>
-        c.id === id
-          ? { ...c, status: "cancelled" }
-          : c
-      )
-    );
+    setConsultations(prev => prev.filter(c => c.id !== id));
   }
 
 
