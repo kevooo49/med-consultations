@@ -264,10 +264,6 @@
    KOSZYK – STRONA
 ===================== */
 
-.cartPage {
-  margin-top: 32px;
-}
-
 .cartTitle {
   margin-bottom: 16px;
 }
@@ -382,3 +378,30 @@
 }
 
 
+/* =======================
+   LISTY: DOSTĘPNOŚĆ / ABSENCJE
+======================= */
+
+.listsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-top: 32px;
+}
+
+.listColumn {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 16px 18px;
+}
+
+.listColumn h3 {
+  margin-top: 0;
+  margin-bottom: 12px;
+}
+
+.fullWidth {
+  grid-column: 1 / -1; /* ← TO JEST KLUCZ */
+  width: 100%;
+}

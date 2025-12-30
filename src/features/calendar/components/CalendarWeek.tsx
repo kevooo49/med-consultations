@@ -160,14 +160,21 @@ export function CalendarWeek({
           onClose={() => setAbsenceModalOpen(false)}
         />
       )}
-      <AvailabilityList
-        rules={availabilityRules}
-        onRemove={onRemoveAvailability}
-      />
-      <AbsenceList
-        absences={absences}
-        onRemove={onRemoveAbsence}
-      />
+      <div className="listsGrid fullWidth">
+        <div className="listColumn">
+          <AvailabilityList
+            rules={availabilityRules}
+            onRemove={onRemoveAvailability}
+          />
+        </div>
+
+        <div className="listColumn">
+          <AbsenceList
+            absences={absences}
+            onRemove={onRemoveAbsence}
+          />
+        </div>
+      </div>
     </div>
     
   );

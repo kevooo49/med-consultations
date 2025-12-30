@@ -23,7 +23,7 @@ export function Cart({ items, onRemove, onCheckout }: Props) {
   );
 
   return (
-    <section className="cartPage">
+    <section className="cartPage fullWidth">
       <h2 className="cartTitle">Koszyk</h2>
 
       {items.length === 0 ? (

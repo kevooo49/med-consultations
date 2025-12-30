@@ -7,6 +7,8 @@ import "../styles/calendar.css";
 import { consultationConflictsWithAbsence } from "../features/calendar/utils/conflicts";
 import { InfoModal } from "../features/calendar/components/InfoModal";
 import { Cart } from "../features/calendar/components/Cart";
+import { consultationConflictsWithAvailability } from "../features/calendar/utils/availabilityConflicts";
+
 
 /* === SERVICES === */
 import {
@@ -19,7 +21,6 @@ import {
 import {
   getAvailability,
   addAvailability,
-  removeAvailability,
 } from "../services/availabilityService";
 
 import {
@@ -74,9 +75,34 @@ export default function App() {
   }
 
   async function handleRemoveAvailability(id: string) {
-    await removeAvailability(id);
-    setAvailabilityRules(prev => prev.filter(r => r.id !== id));
+    const updatedAvailability = availabilityRules.filter(r => r.id !== id);
+
+    let cancelledAny = false;
+
+    const updatedConsultations = consultations.map(c => {
+      if (
+        c.status === "booked" &&
+        consultationConflictsWithAvailability(c, updatedAvailability)
+      ) {
+        cancelledAny = true;
+        return {
+          ...c,
+          status: "cancelled" as Consultation["status"],
+        };
+      }
+      return c;
+    });
+
+    setAvailabilityRules(updatedAvailability);
+    setConsultations(updatedConsultations);
+
+    if (cancelledAny) {
+      setInfoMessage(
+        "Niektóre konsultacje kolidowały z usuwaną dostępnością i zostały odwołane. Pacjenci zostali powiadomieni."
+      );
+    }
   }
+
 
   /* =====================
      ABSENCES
