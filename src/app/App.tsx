@@ -5,33 +5,21 @@ import { getWeekStart } from "../features/calendar/utils/calendarMath";
 import type { Absence, AvailabilityRule, Consultation } from "../features/calendar/types";
 import "../styles/calendar.css";
 import { consultationConflictsWithAbsence } from "../features/calendar/utils/conflicts";
+import { consultationConflictsWithAvailability } from "../features/calendar/utils/availabilityConflicts";
 import { InfoModal } from "../features/calendar/components/InfoModal";
 import { Cart } from "../features/calendar/components/Cart";
-import { consultationConflictsWithAvailability } from "../features/calendar/utils/availabilityConflicts";
 
-
-/* === SERVICES === */
-import {
-  getConsultationsForDoctor,
-  addConsultation,
-  cancelConsultation,
-  saveConsultations,
-} from "../services/consultationsService";
-
-import {
-  getAvailability,
-  addAvailability,
-} from "../services/availabilityService";
-
-import {
-  getAbsences,
-  addAbsence,
-  removeAbsence,
-} from "../services/absencesService";
+/* === BACKENDS === */
+import type { BackendType } from "../services/backend";
+import { firebaseBackend } from "../services/firebaseBackend";
+import { localBackend } from "../services/localBackend";
 
 export default function App() {
   const doctorId = "d1";
 
+  /* =====================
+     STATE
+  ===================== */
   const [anchorDate, setAnchorDate] = useState<Date>(() => new Date());
   const [now, setNow] = useState<Date>(() => new Date());
 
@@ -40,38 +28,55 @@ export default function App() {
   const [absences, setAbsences] = useState<Absence[]>([]);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
 
+  const [backendType, setBackendType] = useState<BackendType>("firebase");
+
+  const backend = backendType === "firebase"
+    ? firebaseBackend
+    : localBackend;
+
   const weekStart = useMemo(() => getWeekStart(anchorDate), [anchorDate]);
 
-  const cartItems = consultations.filter(c => c.status === "draft");
+  /* =====================
+     DERIVED DATA
+  ===================== */
+  const doctorConsultations = useMemo(
+    () => consultations.filter(c => c.doctorId === doctorId),
+    [consultations, doctorId]
+  );
+
+  const cartItems = doctorConsultations.filter(c => c.status === "draft");
 
   /* =====================
-     INITIAL LOAD
+     LISTENERS (DYNAMIC BACKEND)
   ===================== */
   useEffect(() => {
-    getConsultationsForDoctor(doctorId).then(setConsultations);
-    getAvailability().then(setAvailabilityRules);
-    getAbsences().then(setAbsences);
-  }, []);
+    const u1 = backend.listenConsultations(setConsultations);
+    const u2 = backend.listenAvailability(setAvailabilityRules);
+    const u3 = backend.listenAbsences(setAbsences);
+
+    return () => {
+      u1();
+      u2();
+      u3();
+    };
+  }, [backendType]);
 
   /* =====================
      CONSULTATIONS
   ===================== */
   async function handleAddConsultation(c: Consultation) {
-    await addConsultation(c);
-    setConsultations(prev => [...prev, c]);
+    await backend.addConsultation(c);
   }
 
   async function handleCancelConsultation(id: string) {
-    await cancelConsultation(id);
-    setConsultations(prev => prev.filter(c => c.id !== id));
+    await backend.removeConsultation(id);
   }
 
   /* =====================
      AVAILABILITY
   ===================== */
   async function handleAddAvailability(rule: AvailabilityRule) {
-    await addAvailability(rule);
-    setAvailabilityRules(prev => [...prev, rule]);
+    await backend.addAvailability(rule);
   }
 
   async function handleRemoveAvailability(id: string) {
@@ -79,22 +84,21 @@ export default function App() {
 
     let cancelledAny = false;
 
-    const updatedConsultations = consultations.map(c => {
-      if (
-        c.status === "booked" &&
-        consultationConflictsWithAvailability(c, updatedAvailability)
-      ) {
-        cancelledAny = true;
-        return {
-          ...c,
-          status: "cancelled" as Consultation["status"],
-        };
-      }
-      return c;
-    });
+    const conflicts = doctorConsultations.filter(c =>
+      c.status === "booked" &&
+      consultationConflictsWithAvailability(c, updatedAvailability)
+    );
 
-    setAvailabilityRules(updatedAvailability);
-    setConsultations(updatedConsultations);
+    if (conflicts.length > 0) {
+      cancelledAny = true;
+      await Promise.all(
+        conflicts.map(c =>
+          backend.updateConsultation(c.id, { status: "cancelled" })
+        )
+      );
+    }
+
+    await backend.removeAvailability(id);
 
     if (cancelledAny) {
       setInfoMessage(
@@ -103,58 +107,52 @@ export default function App() {
     }
   }
 
-
   /* =====================
      ABSENCES
   ===================== */
   async function handleAddAbsence(absence: Absence) {
     let cancelledAny = false;
 
-    const updatedConsultations = consultations.map(c => {
-      if (
-        c.status === "booked" &&
-        consultationConflictsWithAbsence(c, absence)
-      ) {
-        cancelledAny = true;
-        return { ...c, status: "cancelled" as Consultation["status"] };
-      }
-      return c;
-    });
+    const conflicts = doctorConsultations.filter(c =>
+      c.status === "booked" &&
+      consultationConflictsWithAbsence(c, absence)
+    );
+
+    if (conflicts.length > 0) {
+      cancelledAny = true;
+      await Promise.all(
+        conflicts.map(c =>
+          backend.updateConsultation(c.id, { status: "cancelled" })
+        )
+      );
+    }
+
+    await backend.addAbsence(absence);
 
     if (cancelledAny) {
       setInfoMessage(
         "Niektóre konsultacje kolidowały z absencją i zostały odwołane. Pacjenci zostali powiadomieni."
       );
     }
-
-    await saveConsultations(updatedConsultations);
-    await addAbsence(absence);
-
-    setConsultations(updatedConsultations);
-    setAbsences(prev => [...prev, absence]);
   }
 
   async function handleRemoveAbsence(id: string) {
-    await removeAbsence(id);
-    setAbsences(prev => prev.filter(a => a.id !== id));
+    await backend.removeAbsence(id);
   }
 
   /* =====================
      CART
   ===================== */
   async function handleRemoveFromCart(id: string) {
-    const updated = consultations.filter(c => c.id !== id);
-    await saveConsultations(updated);
-    setConsultations(updated);
+    await backend.removeConsultation(id);
   }
 
   async function handleCheckout() {
-    const updated = consultations.map(c =>
-      c.status === "draft" ? { ...c, status: "booked" as Consultation["status"]} : c
+    await Promise.all(
+      cartItems.map(c =>
+        backend.updateConsultation(c.id, { status: "booked" })
+      )
     );
-
-    await saveConsultations(updated);
-    setConsultations(updated);
   }
 
   /* =====================
@@ -186,6 +184,15 @@ export default function App() {
           <button className="btn" onClick={() => setAnchorDate(d => addWeeks(d, 1))}>
             Następny tydzień ▶
           </button>
+
+          {/* 🔁 BACKEND SWITCH */}
+          <select
+            value={backendType}
+            onChange={e => setBackendType(e.target.value as BackendType)}
+          >
+            <option value="firebase">Firebase</option>
+            <option value="local">Local JSON</option>
+          </select>
         </div>
       </div>
 
@@ -198,7 +205,7 @@ export default function App() {
 
       <CalendarWeek
         weekStart={weekStart}
-        consultations={consultations}
+        consultations={doctorConsultations}
         now={now}
         visibleHours={6}
         onAddConsultation={handleAddConsultation}
