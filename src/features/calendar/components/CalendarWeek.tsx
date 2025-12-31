@@ -15,16 +15,23 @@ type Props = {
   consultations: Consultation[];
   now: Date;
   visibleHours: number;
-  onAddConsultation: (c: Consultation) => void;
+  
+  // Funkcje konsultacji (Pacjent rezerwuje, Lekarz widzi)
+  onAddConsultation?: (c: Consultation) => void;
   onCancelConsultation: (id: string) => void;
-  availabilityRules: AvailabilityRule[];
-  onAddAvailability: (rule: AvailabilityRule) => void;
-  onRemoveAvailability: (id: string) => void;
-  onAddAbsence: (a: Absence) => void;
-  onRemoveAbsence: (id: string) => void;
-  absences: Absence[];
-};
 
+  // Funkcje dostępności (Tylko lekarz - opcjonalne)
+  availabilityRules: AvailabilityRule[];
+  onAddAvailability?: (rule: AvailabilityRule) => void;
+  onRemoveAvailability?: (id: string) => void;
+
+  // Funkcje absencji (Tylko lekarz - opcjonalne)
+  onAddAbsence?: (a: Absence) => void;
+  onRemoveAbsence?: (id: string) => void;
+  absences: Absence[];
+
+  currentUserId?: string;
+};
 
 export function CalendarWeek({
   weekStart,
@@ -38,12 +45,10 @@ export function CalendarWeek({
   onRemoveAvailability,
   onAddAbsence,
   onRemoveAbsence,
-  absences
+  absences,
+  currentUserId
 }: Props) {
   const days = getDaysOfWeek(weekStart);
-
-  console.log("CalendarWeek absences:", absences);
-
 
   // pełna doba (24h)
   const FULL_DAY_HOURS = 24;
@@ -53,7 +58,6 @@ export function CalendarWeek({
 
   const [availabilityModalOpen, setAvailabilityModalOpen] = useState(false);
   const [absenceModalOpen, setAbsenceModalOpen] = useState(false);
-
 
   useEffect(() => {
     if (!scrollRef.current) return;
@@ -78,18 +82,32 @@ export function CalendarWeek({
 
   return (
     <div className="calendarGrid">
+      {/* Pasek z przyciskami - widoczny, ale przyciski tylko dla Lekarza */}
       <div className="calendarTopBar">
-        <div className="title">Harmonogram konsultacji</div>
-        <button
-          className="btn"
-          onClick={() => setAvailabilityModalOpen(true)}
-        >
-          Dodaj dostępność
-        </button>
-        <button className="btn secondary" onClick={() => setAbsenceModalOpen(true)}>
-          Dodaj absencję
-        </button>
+        {/* Tytuł usunąłem, bo masz go już w App.tsx nad komponentem, żeby nie dublować */}
+        <div style={{ flex: 1 }}></div> 
+        
+        {/* Przycisk widoczny TYLKO jeśli przekazano funkcję (Lekarz) */}
+        {onAddAvailability && (
+          <button
+            className="btn"
+            onClick={() => setAvailabilityModalOpen(true)}
+          >
+            Dodaj dostępność
+          </button>
+        )}
+        
+        {/* Przycisk widoczny TYLKO jeśli przekazano funkcję (Lekarz) */}
+        {onAddAbsence && (
+          <button 
+            className="btn secondary" 
+            onClick={() => setAbsenceModalOpen(true)}
+          >
+            Dodaj absencję
+          </button>
+        )}
       </div>
+
       <div className="weekHeaderRow">
         <div />
         {days.map(d => {
@@ -128,9 +146,11 @@ export function CalendarWeek({
               consultations={consultations}
               now={now}
               availabilityRules={availabilityRules}
-              onAddConsultation={onAddConsultation}
+              // Przekazujemy dalej (mogą być undefined - DayColumn musi to obsłużyć)
+              onAddConsultation={onAddConsultation} 
               onCancelConsultation={onCancelConsultation}
               absences={absences}
+              currentUserId={currentUserId}
             />
           ))}
 
@@ -141,7 +161,9 @@ export function CalendarWeek({
           />
         </div>
       </div>
-      {availabilityModalOpen && (
+
+      {/* Modale - renderujemy warunkowo, choć stan i tak steruje widocznością */}
+      {availabilityModalOpen && onAddAvailability && (
         <AvailabilityModal
           absences={absences}
           onSave={(rule) => {
@@ -151,7 +173,8 @@ export function CalendarWeek({
           onClose={() => setAvailabilityModalOpen(false)}
         />
       )}
-      {absenceModalOpen && (
+
+      {absenceModalOpen && onAddAbsence && (
         <AbsenceModal
           onSave={(a) => {
             onAddAbsence(a);
@@ -160,22 +183,29 @@ export function CalendarWeek({
           onClose={() => setAbsenceModalOpen(false)}
         />
       )}
-      <div className="listsGrid fullWidth">
-        <div className="listColumn">
-          <AvailabilityList
-            rules={availabilityRules}
-            onRemove={onRemoveAvailability}
-          />
-        </div>
 
-        <div className="listColumn">
-          <AbsenceList
-            absences={absences}
-            onRemove={onRemoveAbsence}
-          />
+      {/* Listy edycji - widoczne tylko jeśli użytkownik ma prawo usuwać (Lekarz) */}
+      {(onRemoveAvailability || onRemoveAbsence) && (
+        <div className="listsGrid fullWidth">
+          {onRemoveAvailability && (
+            <div className="listColumn">
+              <AvailabilityList
+                rules={availabilityRules}
+                onRemove={onRemoveAvailability}
+              />
+            </div>
+          )}
+
+          {onRemoveAbsence && (
+            <div className="listColumn">
+              <AbsenceList
+                absences={absences}
+                onRemove={onRemoveAbsence}
+              />
+            </div>
+          )}
         </div>
-      </div>
+      )}
     </div>
-    
   );
 }

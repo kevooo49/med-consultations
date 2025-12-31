@@ -49,3 +49,14 @@ export type Absence = {
   from: string; // yyyy-MM-dd
   to: string;   // yyyy-MM-dd
 };
+
+export type UserRole = "patient" | "doctor" | "admin";
+
+export interface AppUser {
+  uid: string;
+  email: string;
+  role: UserRole;
+  firstName?: string;
+  lastName?: string;
+  isBanned?: boolean;
+}

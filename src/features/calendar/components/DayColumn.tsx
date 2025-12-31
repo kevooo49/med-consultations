@@ -7,16 +7,20 @@ import clsx from "clsx";
 import { BookingModal } from "./BookingModal";
 import { isSlotInAvailability, isDayAbsent } from "../utils/calendarMath";
 
-
 type Props = {
   day: Date;
   totalSlots: number;
   consultations: Consultation[];
   now: Date;
-  onAddConsultation: (c: Consultation) => void;
+  
+  // ZMIANA: opcjonalna funkcja (Pacjent ma, Lekarz nie)
+  onAddConsultation?: (c: Consultation) => void; 
+  
   onCancelConsultation: (id: string) => void;
   availabilityRules: AvailabilityRule[];
   absences: Absence[];
+
+  currentUserId?: string;
 };
 
 export function DayColumn({
@@ -27,7 +31,8 @@ export function DayColumn({
   onAddConsultation,
   onCancelConsultation,
   availabilityRules,
-  absences
+  absences,
+  currentUserId
 }: Props) {
   const isToday = isSameDay(day, now);
   const colRef = useRef<HTMLDivElement>(null);
@@ -37,7 +42,6 @@ export function DayColumn({
   const [isDragging, setIsDragging] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalRange, setModalRange] = useState<{ start: number; end: number } | null>(null);
-
   
   const dayStart = new Date(day);
   dayStart.setHours(0, 0, 0, 0);
@@ -47,16 +51,6 @@ export function DayColumn({
   );
 
   const dayAbsent = isDayAbsent(day, absences);
-
-  console.log(
-    "DayColumn",
-    day.toISOString().slice(0, 10),
-    "absences:",
-    absences,
-    "dayAbsent:",
-    dayAbsent
-  );
-
 
   // ❗ slot pod myszą
   function getSlotFromMouse(e: React.MouseEvent) {
@@ -86,6 +80,9 @@ export function DayColumn({
   }
 
   function handleMouseDown(e: React.MouseEvent) {
+    // ZMIANA: Jeśli nie przekazano funkcji dodawania (np. widok lekarza), 
+    // to blokujemy interakcję zaznaczania.
+    if (!onAddConsultation) return;
 
     if (dayAbsent) return;
 
@@ -131,37 +128,26 @@ export function DayColumn({
 
       setModalRange({ start: from, end: to });
       setModalOpen(true);
-
     }
   }
 
   return (
     <div
       ref={colRef}
+      // Opcjonalnie: można dodać styl cursor: default jeśli brak onAddConsultation
       className={clsx("dayCol", isToday && "todayCol", dayAbsent && "slotAbsent")}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
+      style={{ cursor: onAddConsultation ? "pointer" : "default" }}
     >
       {/* siatka */}
       {Array.from({ length: totalSlots }).map((_, i) => {
         const minutesFromStart = i * 30;
 
-        // const available = isSlotInAvailability(
-        //   day,
-        //   minutesFromStart,
-        //   availabilityRules
-        // );
         const unavailable =
           dayAbsent || !isSlotInAvailability(day, minutesFromStart, availabilityRules);
-
-        if (i === 0) {
-          console.log(
-            "First slot classes:",
-            `slotBlock ${unavailable ? "slotUnavailable" : ""} ${dayAbsent ? "slotAbsent" : ""}`
-          );
-        }
 
         return (
           <div
@@ -173,15 +159,22 @@ export function DayColumn({
       })}
 
       {/* wizyty */}
-      {dayEvents.map(c => (
-        <EventBlock
-          key={c.id}
-          consultation={c}
-          dayStart={dayStart}
-          now={now}
-          onCancel={() => onCancelConsultation(c.id)}
-        />
-      ))}
+      {dayEvents.map(c => {
+        const isPatientView = !!onAddConsultation; 
+        const isMyConsultation = (c as any).patientId === currentUserId;
+        const isForeign = isPatientView && !isMyConsultation;
+
+        return(
+          <EventBlock
+            key={c.id}
+            consultation={c}
+            dayStart={dayStart}
+            now={now}
+            onCancel={isForeign ? undefined : () => onCancelConsultation(c.id)}
+            isForeign={isForeign}
+          />
+        );
+      })}
 
       {/* zaznaczenie */}
       {selectionStart !== null && selectionEnd !== null && (
@@ -191,7 +184,8 @@ export function DayColumn({
         />
       )}
 
-      {modalOpen && modalRange && (
+      {/* ZMIANA: Modal renderujemy tylko jeśli mamy funkcję onAddConsultation */}
+      {modalOpen && modalRange && onAddConsultation && (
         <BookingModal
           day={day}
           startSlot={modalRange.start}
@@ -211,7 +205,6 @@ export function DayColumn({
           }}
         />
       )}
-
     </div>
   );
 }
