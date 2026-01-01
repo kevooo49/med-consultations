@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { format } from "date-fns";
 import type { Consultation } from "../types";
 import { calculatePrice } from "../utils/pricing";
+import { Link as LinkIcon } from "lucide-react"; // Dodano ikonę
 
 export type ConsultationType =
   | "first_visit"
@@ -32,11 +33,13 @@ export function BookingModal({ day, startSlot, endSlot, onClose, onSave }: Props
   const [type, setType] = useState<ConsultationType | "">("");
   const [fullName, setFullName] = useState("");
   const [gender, setGender] = useState<Gender | "">("");
-  const [age, setAge] = useState<string>(""); // string -> łatwiejsza walidacja
+  const [age, setAge] = useState<string>(""); 
   const [notes, setNotes] = useState("");
-  const [files, setFiles] = useState<File[]>([]);
+  
+  // ZMIANA: Zamiast plików, przechowujemy link (string)
+  const [docLink, setDocLink] = useState("");
+  
   const [errors, setErrors] = useState<Record<string, string>>({});
-
 
   const fromMinutes = Math.min(startSlot, endSlot) * 30;
   const toMinutes = (Math.max(startSlot, endSlot) + 1) * 30;
@@ -59,7 +62,7 @@ export function BookingModal({ day, startSlot, endSlot, onClose, onSave }: Props
     gender !== "" ||
     age !== "" ||
     notes.trim() !== "" ||
-    files.length > 0;
+    docLink.trim() !== ""; // ZMIANA
 
   function handleCloseRequest() {
     if (!isDirty) {
@@ -78,22 +81,22 @@ export function BookingModal({ day, startSlot, endSlot, onClose, onSave }: Props
     const newErrors: Record<string, string> = {};
 
     if (!type) {
-        newErrors.type = "Wybierz typ konsultacji";
+      newErrors.type = "Wybierz typ konsultacji";
     }
 
     if (!fullName.trim()) {
-        newErrors.fullName = "Imię i nazwisko jest wymagane";
+      newErrors.fullName = "Imię i nazwisko jest wymagane";
     }
 
     if (!gender) {
-        newErrors.gender = "Wybierz płeć pacjenta";
+      newErrors.gender = "Wybierz płeć pacjenta";
     }
 
     const ageNumber = Number(age);
     if (!age || Number.isNaN(ageNumber)) {
-        newErrors.age = "Podaj wiek pacjenta";
+      newErrors.age = "Podaj wiek pacjenta";
     } else if (ageNumber < 0 || ageNumber > 120) {
-        newErrors.age = "Wiek musi być w zakresie 0–120";
+      newErrors.age = "Wiek musi być w zakresie 0–120";
     }
 
     setErrors(newErrors);
@@ -106,42 +109,38 @@ export function BookingModal({ day, startSlot, endSlot, onClose, onSave }: Props
 
     const safeType = type as Consultation["type"];
     const safeGender = gender as NonNullable<Consultation["patient"]>["gender"];
-
-    const durationMin = toMinutes - fromMinutes;
     const price = calculatePrice(durationMin);
 
+    // ZMIANA: Tworzenie tablicy dokumentów z linku
+    const documents = docLink 
+      ? [{ name: "Dokumentacja zewnętrzna (Link)", url: docLink }] 
+      : [];
 
     const consultation: Consultation = {
       id: crypto.randomUUID(),
-      doctorId: "d1", // na razie na sztywno
+      doctorId: "d1", // To zostanie nadpisane w App.tsx dynamicznym ID
       start: from.toISOString(),
       end: to.toISOString(),
       type: safeType,
       status: "draft",
       price,
       patient: {
-        fullName,
+        fullName, // To pole musi zostać zachowane!
         gender: safeGender,
         age: Number(age),
       },
       notes,
-      documents: files.map(f => ({ name: f.name })),
+      documents, // Zapisujemy link
     };
 
     onSave(consultation);
   }
 
-
-
-
   return (
     <div
       className="modalBackdrop"
       onMouseDown={(e) => {
-        // klik na tło zamyka (możesz usunąć jeśli nie chcesz)
         e.stopPropagation();
-        // jeśli chcesz zamykać po kliknięciu w tło:
-        // handleCloseRequest();
       }}
       onClick={(e) => e.stopPropagation()}
     >
@@ -224,18 +223,22 @@ export function BookingModal({ day, startSlot, endSlot, onClose, onSave }: Props
             />
           </label>
 
+          {/* ZMIANA: Pole na link zamiast pliku */}
           <label>
-            Dokumenty (np. wyniki badań)
-            <input
-              type="file"
-              multiple
-              onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
-            />
-            {files.length > 0 && (
-              <div style={{ fontSize: 12, marginTop: 6, opacity: 0.85 }}>
-                Dołączono: {files.map((f) => f.name).join(", ")}
-              </div>
-            )}
+            Dokumenty (Link do chmury)
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+               <LinkIcon size={18} style={{color: '#6b7280'}}/>
+               <input
+                 type="text"
+                 value={docLink}
+                 onChange={(e) => setDocLink(e.target.value)}
+                 placeholder="Wklej link (np. Google Drive, Dropbox)..."
+                 style={{ flex: 1 }}
+               />
+            </div>
+            <div style={{ fontSize: 11, marginTop: 4, opacity: 0.7 }}>
+               Lekarz otrzyma dostęp do tego linku w szczegółach wizyty.
+            </div>
           </label>
         </div>
 

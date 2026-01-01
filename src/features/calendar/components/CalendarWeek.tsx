@@ -15,21 +15,14 @@ type Props = {
   consultations: Consultation[];
   now: Date;
   visibleHours: number;
-  
-  // Funkcje konsultacji (Pacjent rezerwuje, Lekarz widzi)
   onAddConsultation?: (c: Consultation) => void;
   onCancelConsultation: (id: string) => void;
-
-  // Funkcje dostępności (Tylko lekarz - opcjonalne)
   availabilityRules: AvailabilityRule[];
   onAddAvailability?: (rule: AvailabilityRule) => void;
   onRemoveAvailability?: (id: string) => void;
-
-  // Funkcje absencji (Tylko lekarz - opcjonalne)
   onAddAbsence?: (a: Absence) => void;
   onRemoveAbsence?: (id: string) => void;
   absences: Absence[];
-
   currentUserId?: string;
 };
 
@@ -49,11 +42,8 @@ export function CalendarWeek({
   currentUserId
 }: Props) {
   const days = getDaysOfWeek(weekStart);
-
-  // pełna doba (24h)
   const FULL_DAY_HOURS = 24;
   const fullDaySlots = (FULL_DAY_HOURS * 60) / SLOT_MINUTES;
-
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const [availabilityModalOpen, setAvailabilityModalOpen] = useState(false);
@@ -61,83 +51,66 @@ export function CalendarWeek({
 
   useEffect(() => {
     if (!scrollRef.current) return;
-
     const now = new Date();
     const hour = now.getHours();
     const minute = now.getMinutes();
-
     let targetMinutes: number;
 
     if (hour >= 7 && hour <= 19) {
-      // centrowanie aktualnego czasu
       targetMinutes = hour * 60 + minute - visibleHours * 30;
     } else {
-      // start od 7:00
       targetMinutes = 7 * 60;
     }
-
     const scrollTop = Math.max(0, targetMinutes * 2);
     scrollRef.current.scrollTop = scrollTop;
   }, []);
 
+  // Logika czy pokazywać pasek narzędzi (tylko jeśli mamy jakieś akcje)
+  const showToolbar = onAddAvailability || onAddAbsence;
+
   return (
     <div className="calendarGrid">
-      {/* Pasek z przyciskami - widoczny, ale przyciski tylko dla Lekarza */}
-      <div className="calendarTopBar">
-        {/* Tytuł usunąłem, bo masz go już w App.tsx nad komponentem, żeby nie dublować */}
-        <div style={{ flex: 1 }}></div> 
-        
-        {/* Przycisk widoczny TYLKO jeśli przekazano funkcję (Lekarz) */}
-        {onAddAvailability && (
-          <button
-            className="btn"
-            onClick={() => setAvailabilityModalOpen(true)}
-          >
-            Dodaj dostępność
-          </button>
-        )}
-        
-        {/* Przycisk widoczny TYLKO jeśli przekazano funkcję (Lekarz) */}
-        {onAddAbsence && (
-          <button 
-            className="btn secondary" 
-            onClick={() => setAbsenceModalOpen(true)}
-          >
-            Dodaj absencję
-          </button>
-        )}
-      </div>
+      
+      {/* 1. PASEK NARZĘDZI (Jeśli lekarz) */}
+      {showToolbar && (
+        <div className="calendarToolbar">
+          {onAddAvailability && (
+            <button className="btn" onClick={() => setAvailabilityModalOpen(true)}>
+              Dodaj dostępność
+            </button>
+          )}
+          {onAddAbsence && (
+            <button className="btn secondary" onClick={() => setAbsenceModalOpen(true)}>
+              Dodaj absencję
+            </button>
+          )}
+        </div>
+      )}
 
+      {/* 2. NAGŁÓWKI DNI */}
       <div className="weekHeaderRow">
-        <div />
+        <div /> {/* Pusty róg nad czasem */}
         {days.map(d => {
           const count = consultations.filter(c => {
             const s = parseISO(c.start);
             return isSameDay(s, d) && c.status === "booked";
           }).length;
-
           const isToday = isSameDay(d, now);
 
           return (
-            <div
-              key={d.toISOString()}
-              className={`dayHeader ${isToday ? "todayHeader" : ""}`}
-            >
+            <div key={d.toISOString()} className={`dayHeader ${isToday ? "todayHeader" : ""}`}>
               <div>{dayHeaderLabel(d)}</div>
-              <div className="count">Zarezerwowane: {count}</div>
+              <div className="count">Wizyt: {count}</div>
             </div>
           );
         })}
       </div>
 
-      {/* WSPÓLNY SCROLL */}
+      {/* 3. OBSZAR SCROLLOWANY */}
       <div className="calendarScroll" ref={scrollRef}>
         <TimeGutter totalSlots={fullDaySlots} />
 
-        <div
-          className="bodyRow"
-          style={{ height: fullDaySlots * 60 }}
-        >
+        <div className="bodyRow" style={{ height: fullDaySlots * 60 }}>
           {days.map(d => (
             <DayColumn
               key={d.toISOString()}
@@ -146,23 +119,17 @@ export function CalendarWeek({
               consultations={consultations}
               now={now}
               availabilityRules={availabilityRules}
-              // Przekazujemy dalej (mogą być undefined - DayColumn musi to obsłużyć)
-              onAddConsultation={onAddConsultation} 
+              onAddConsultation={onAddConsultation}
               onCancelConsultation={onCancelConsultation}
               absences={absences}
               currentUserId={currentUserId}
             />
           ))}
-
-          <NowIndicator
-            weekDays={days}
-            totalSlots={fullDaySlots}
-            now={now}
-          />
+          <NowIndicator weekDays={days} totalSlots={fullDaySlots} now={now} />
         </div>
       </div>
 
-      {/* Modale - renderujemy warunkowo, choć stan i tak steruje widocznością */}
+      {/* MODALE */}
       {availabilityModalOpen && onAddAvailability && (
         <AvailabilityModal
           absences={absences}
@@ -184,20 +151,21 @@ export function CalendarWeek({
         />
       )}
 
-      {/* Listy edycji - widoczne tylko jeśli użytkownik ma prawo usuwać (Lekarz) */}
+      {/* LISTY EDYCJI (LEKARZ) */}
       {(onRemoveAvailability || onRemoveAbsence) && (
-        <div className="listsGrid fullWidth">
+        <div className="listsGrid">
           {onRemoveAvailability && (
             <div className="listColumn">
+              <h3>Twoje reguły dostępności</h3>
               <AvailabilityList
                 rules={availabilityRules}
                 onRemove={onRemoveAvailability}
               />
             </div>
           )}
-
           {onRemoveAbsence && (
             <div className="listColumn">
+              <h3>Zaplanowane nieobecności</h3>
               <AbsenceList
                 absences={absences}
                 onRemove={onRemoveAbsence}

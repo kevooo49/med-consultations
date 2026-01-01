@@ -3,6 +3,7 @@ import { ref, update } from "firebase/database";
 import { db } from "../../../firebaseConfig";
 import { useAuth } from "../../../context/AuthContext";
 import { X } from "lucide-react";
+import { SPECIALIZATIONS } from "../../../utils/specializations";
 
 export function EditProfileModal({ onClose }: { onClose: () => void }) {
   const { user } = useAuth();
@@ -10,6 +11,7 @@ export function EditProfileModal({ onClose }: { onClose: () => void }) {
   const [firstName, setFirstName] = useState(user?.firstName || "");
   const [lastName, setLastName] = useState(user?.lastName || "");
   const [specialization, setSpecialization] = useState(user?.specialization || "");
+  const [city, setCity] = useState(user?.city || "");
   
   // ZMIANA: Edycja URL jako string
   const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl || "");
@@ -24,6 +26,7 @@ export function EditProfileModal({ onClose }: { onClose: () => void }) {
       const updates: any = {
         firstName,
         lastName,
+        city,
         avatarUrl // Zapisujemy stringa z inputa
       };
 
@@ -93,13 +96,27 @@ export function EditProfileModal({ onClose }: { onClose: () => void }) {
              </div>
           </div>
 
+          <div>
+             <label>Miasto</label>
+             <input 
+               value={city} onChange={e => setCity(e.target.value)}
+               style={{width: '100%', padding: 8, marginTop: 4}} 
+               placeholder="np. Kraków"
+             />
+          </div>
+
           {user?.role === 'doctor' && (
             <div>
-               <label>Specjalizacja</label>
-               <input 
-                 value={specialization} onChange={e => setSpecialization(e.target.value)}
-                 style={{width: '100%', padding: 8, marginTop: 4}} 
-               />
+              <label>Specjalizacja</label>
+                <select 
+                  value={specialization} 
+                  onChange={e => setSpecialization(e.target.value)}
+                  style={{width: '100%', padding: 8, marginTop: 4}} 
+                >
+                  {SPECIALIZATIONS.map(spec => (
+                    <option key={spec} value={spec}>{spec}</option>
+                  ))}
+              </select>
             </div>
           )}
 

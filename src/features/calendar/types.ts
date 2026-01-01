@@ -61,7 +61,10 @@ export interface AppUser {
   firstName?: string;
   lastName?: string;
   isBanned?: boolean;
-
+  city?: string;
   specialization?: string;
   avatarUrl?: string;
+
+  averageRating?: number;
+  reviewsCount?: number;
 }

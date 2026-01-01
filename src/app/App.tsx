@@ -16,43 +16,71 @@ import { localBackend } from "../services/localBackend";
 
 /* === AUTH & ADMIN === */
 import { useAuth } from "../context/AuthContext";
-import { AuthForm } from "../features/calendar/components/AuthForm";
+import { AuthForm } from "../features/calendar/components/AuthForm"; // Upewnij się co do ścieżki
 import { UserList } from "../features/admin/UserList";
 import { CreateDoctorForm } from "../features/admin/CreateDoctorForm";
 import { PersistenceSettings } from "../features/admin/PersistenceSettings";
 import { DoctorList } from "../features/doctors/DoctorList";
 import { ReviewsSection } from "../features/reviews/ReviewsSection";
+import { AdminReviewsPanel } from "../features/admin/AdminReviewsPanel";
 
 /* === ICONS & UI === */
-import { LogOut, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Settings, ArrowLeft } from "lucide-react";
-import { EditProfileModal } from "../features/calendar/components/EditProfileModal";
+import { LogOut, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Settings, ArrowLeft, Megaphone } from "lucide-react";
+import { EditProfileModal } from "../features/calendar/components/EditProfileModal"; // Upewnij się co do ścieżki
 
 /* === NOTIFICATIONS === */
 import { sendNotificationToUser } from "../services/notificationService";
-import { NotificationToast } from "../features/calendar/components/NotificationToast";
-import { Megaphone } from "lucide-react";
+import { NotificationToast } from "../features/calendar/components/NotificationToast"; // Upewnij się co do ścieżki
+
+/* === ROUTING === */
+import { Routes, Route, useNavigate, useMatch, Navigate } from "react-router-dom";
 
 export default function App() {
-  const { user, logout } = useAuth();
-  
-  const [selectedDoctorId, setSelectedDoctorId] = useState<string | null>(null);
+  return (
+    <Routes>
+      <Route path="/" element={<MainLayout mode="list" />} />
+      <Route path="/login" element={<MainLayout mode="login" />} />
+      <Route path="/admin" element={<MainLayout mode="admin" />} />
+      <Route path="/doctor/:id" element={<MainLayout mode="calendar" />} />
+    </Routes>
+  );
+}
 
-  // === POPRAWKA 1: Płynne przejście po zalogowaniu ===
+// === GŁÓWNY KOMPONENT LOGIKI (Obsługuje wszystkie tryby) ===
+function MainLayout({ mode }: { mode: "list" | "login" | "calendar" | "admin" }) {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  
+  // Pobieramy ID lekarza z URL (tylko w trybie kalendarza)
+  const match = useMatch("/doctor/:id");
+  const urlDoctorId = match?.params.id;
+
+  // === LOGIKA PRZEKIEROWAŃ ===
   useEffect(() => {
     if (user) {
+      // 1. Admina zawsze wyrzucamy do panelu admina (jeśli tam nie jest)
+      if (user.role === 'admin' && mode !== 'admin') {
+        navigate('/admin');
+        return;
+      } 
+      
+      // 2. Lekarza zawsze do JEGO kalendarza
       if (user.role === 'doctor') {
-        setSelectedDoctorId(user.uid);
-      } else {
-        // Jeśli pacjent zalogował się będąc na ekranie logowania ("LOGIN_MODE"),
-        // przenosimy go do listy lekarzy (null).
-        // Jeśli był już na jakimś lekarzu (np. jako gość wybrał lekarza i się zalogował),
-        // to zostawiamy go tam.
-        if (selectedDoctorId === "LOGIN_MODE") {
-          setSelectedDoctorId(null);
+        if (urlDoctorId !== user.uid) {
+           navigate(`/doctor/${user.uid}`);
         }
+        return;
+      }
+
+      // 3. Pacjent: Jeśli zalogował się na stronie logowania, wraca na listę
+      if (mode === 'login') {
+        navigate('/');
       }
     }
-  }, [user, selectedDoctorId]);
+  }, [user, mode, navigate, urlDoctorId]);
+
+  // Wyznaczamy "wybranego lekarza" na podstawie URL
+  const selectedDoctorId = mode === 'calendar' ? urlDoctorId : null;
 
   /* =====================
       STATE
@@ -65,6 +93,7 @@ export default function App() {
   const [absences, setAbsences] = useState<Absence[]>([]);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
 
+  // Stan dla powiadomień (Megafon)
   const [announcement, setAnnouncement] = useState("");
   const [showAnnouncementInput, setShowAnnouncementInput] = useState(false);
 
@@ -77,10 +106,7 @@ export default function App() {
     localStorage.setItem("backendType", newType);
   };
 
-  const backend = backendType === "firebase"
-    ? firebaseBackend
-    : localBackend;
-
+  const backend = backendType === "firebase" ? firebaseBackend : localBackend;
   const weekStart = useMemo(() => getWeekStart(anchorDate), [anchorDate]);
 
   /* =====================
@@ -91,7 +117,7 @@ export default function App() {
   const isAdmin = user?.role === 'admin';
 
   /* =====================
-      DERIVED DATA (FILTROWANIE)
+      DERIVED DATA
   ===================== */
   const targetDoctorId = selectedDoctorId || "none";
 
@@ -100,8 +126,7 @@ export default function App() {
     [consultations, targetDoctorId]
   );
 
-  // === POPRAWKA 2: Filtrujemy dostępność i absencje dla wybranego lekarza ===
-  // Dzięki temu dane jednego lekarza nie pojawią się u drugiego
+  // Filtrowanie dostępności i absencji (Izolacja danych)
   const doctorAvailability = useMemo(
     () => availabilityRules.filter(r => r.doctorId === targetDoctorId),
     [availabilityRules, targetDoctorId]
@@ -120,45 +145,37 @@ export default function App() {
       LISTENERS
   ===================== */
   useEffect(() => {
-    if (isAdmin) return;
-    if (!selectedDoctorId || selectedDoctorId === "LOGIN_MODE") return;
+    // Admin i lista lekarzy nie potrzebują ładować szczegółów kalendarza
+    if (mode === 'admin') return;
+    if (mode !== 'calendar' || !targetDoctorId) return;
 
     const u1 = backend.listenConsultations(setConsultations);
     const u2 = backend.listenAvailability(setAvailabilityRules);
     const u3 = backend.listenAbsences(setAbsences);
 
     return () => {
-      u1();
-      u2();
-      u3();
+      u1(); u2(); u3();
     };
-  }, [backendType, backend, isAdmin, selectedDoctorId]);
+  }, [backendType, backend, mode, targetDoctorId]);
 
   /* =====================
       HANDLERS
   ===================== */
   async function handleAddAvailability(rule: AvailabilityRule) {
     if (!isDoctor) return; 
-    // === POPRAWKA 3: Przypisujemy ID lekarza przy zapisie ===
-    await backend.addAvailability({ ...rule, doctorId: user.uid });
+    await backend.addAvailability({ ...rule, doctorId: user?.uid });
   }
 
   async function handleRemoveAvailability(id: string) {
     if (!isDoctor) return;
     const updatedAvailability = availabilityRules.filter(r => r.id !== id);
     let cancelledAny = false;
-    
-    // Znajdź konflikty
     const conflicts = doctorConsultations.filter(c =>
       c.status === "booked" && consultationConflictsWithAvailability(c, updatedAvailability)
     );
-
     if (conflicts.length > 0) {
       cancelledAny = true;
       const doctorName = `${user?.firstName} ${user?.lastName}`;
-
-      // NOWOŚĆ: Powiadom każdego pacjenta z osobna
-      // Używamy Promise.all żeby wysłać równolegle
       await Promise.all(conflicts.map(async (c) => {
          const patientId = (c as any).patientId;
          if (patientId) {
@@ -170,35 +187,24 @@ export default function App() {
                "warning"
             );
          }
-         // Anulowanie w bazie
          return backend.updateConsultation(c.id, { status: "cancelled" });
       }));
     }
-    
     await backend.removeAvailability(id);
     if (cancelledAny) setInfoMessage("Usunięto dostępność. Pacjenci otrzymali powiadomienia.");
   }
 
   async function handleAddAbsence(absence: Absence) {
     if (!isDoctor) return;
-
     let cancelledAny = false;
-
-    // 1. Szukamy konfliktów (wizyt, które wpadają w czas tej absencji)
     const conflicts = doctorConsultations.filter(c =>
-      c.status === "booked" &&
-      consultationConflictsWithAbsence(c, absence)
+      c.status === "booked" && consultationConflictsWithAbsence(c, absence)
     );
-
     if (conflicts.length > 0) {
       cancelledAny = true;
       const doctorName = user?.firstName ? `${user.firstName} ${user.lastName}` : "Twój Lekarz";
-
-      // 2. Dla każdego konfliktu: wyślij powiadomienie i anuluj wizytę
       await Promise.all(conflicts.map(async (c) => {
         const patientId = (c as any).patientId;
-        
-        // Wysyłamy powiadomienie tylko jeśli mamy ID pacjenta
         if (patientId) {
            const dateStr = format(new Date(c.start), "dd.MM HH:mm");
            await sendNotificationToUser(
@@ -208,20 +214,11 @@ export default function App() {
               "warning"
            );
         }
-
-        // Aktualizujemy status w bazie
         return backend.updateConsultation(c.id, { status: "cancelled" });
       }));
     }
-
-    // 3. Dodajemy absencję do bazy (przypisujemy ID lekarza)
-    await backend.addAbsence({ ...absence, doctorId: user.uid });
-
-    if (cancelledAny) {
-      setInfoMessage(
-        "Dodano absencję. Kolidujące wizyty zostały odwołane, a pacjenci otrzymali powiadomienia."
-      );
-    }
+    await backend.addAbsence({ ...absence, doctorId: user?.uid });
+    if (cancelledAny) setInfoMessage("Dodano absencję. Kolidujące wizyty odwołane.");
   }
 
   async function handleRemoveAbsence(id: string) {
@@ -236,7 +233,7 @@ export default function App() {
       doctorId: targetDoctorId,
       patientId: user?.uid,
       patient: {
-        fullName: `${user?.firstName || ''} ${user?.lastName || user?.email}`, 
+        fullName: c.patient?.fullName || `${user?.firstName || ''} ${user?.lastName || user?.email}`, 
         age: 30,
         gender: "Other"
       }
@@ -258,11 +255,9 @@ export default function App() {
 
     if (isDoctor || isAdmin) {
        const patientId = (targetConsultation as any).patientId;
-       // Wysyłamy tylko jeśli wizyta ma przypisanego pacjenta (nie jest pusta)
        if (patientId) {
           const doctorName = `${user?.firstName} ${user?.lastName}`;
           const dateStr = format(new Date(targetConsultation.start), "dd.MM HH:mm");
-          
           await sendNotificationToUser(
              patientId,
              `Twoja wizyta z dnia ${dateStr} została odwołana.`,
@@ -271,7 +266,6 @@ export default function App() {
           );
        }
     }
-
     await backend.removeConsultation(id);
   }
 
@@ -283,17 +277,14 @@ export default function App() {
     await Promise.all(cartItems.map(c => backend.updateConsultation(c.id, { status: "booked" })));
   }
 
+  // Funkcja Ogłoszenia (Megafon) - PRZENIESIONA I ZINTEGROWANA
   const handleSendAnnouncement = async () => {
     if (!announcement.trim()) return;
     const doctorName = user?.firstName ? `${user.firstName} ${user.lastName}` : "Lekarz";
       
-      // 1. Znajdź unikalnych pacjentów tego lekarza
-      // Pobieramy ID pacjentów ze wszystkich konsultacji (nawet przeszłych lub anulowanych, jeśli są w bazie)
-      // Używamy Set, żeby nie wysłać 5 razy do tego samego pacjenta
+    // 1. Znajdź unikalnych pacjentów tego lekarza
     const uniquePatients = new Set<string>();
-      
     doctorConsultations.forEach(c => {
-         // Zakładamy, że consultation ma pole patientId (dodaliśmy je wcześniej)
       const pid = (c as any).patientId;
       if (pid) uniquePatients.add(pid);
     });
@@ -303,7 +294,7 @@ export default function App() {
       return;
     }
 
-      // 2. Wyślij do każdego
+    // 2. Wyślij do każdego
     const promises = Array.from(uniquePatients).map(pid => 
       sendNotificationToUser(pid, announcement, doctorName, "info")
     );
@@ -321,10 +312,18 @@ export default function App() {
   }, []);
 
   /* =====================
-      RENDER
+      RENDEROWANIE
   ===================== */
 
-  if (isAdmin) {
+  // 1. ADMIN
+  if (mode === 'admin') {
+    // POPRAWKA BEZPIECZEŃSTWA:
+    // Jeśli użytkownik nie jest zalogowany (!user) LUB nie ma roli admin -> Wyrzuć na stronę główną.
+    // Używamy <Navigate> zamiast return null/div, żeby od razu zmienić adres URL.
+    if (!user || user.role !== 'admin') {
+      return <Navigate to="/" replace />;
+    }
+    
     return (
       <div className="calendar" style={{height: '100vh', display: 'flex', flexDirection: 'column'}}>
         <UserBar user={user} logout={logout} />
@@ -356,35 +355,41 @@ export default function App() {
                <CreateDoctorForm />
             </div>
           </div>
+
+          {/* NOWOŚĆ: Panel do usuwania komentarzy (Wymaganie projektowe) */}
+          <AdminReviewsPanel />
+
           <PersistenceSettings />
         </div>
       </div>
     );
   }
 
-  if (!selectedDoctorId) {
+  // 2. WIDOK LISTY LEKARZY
+  if (mode === 'list') {
     return (
       <div style={{minHeight: '100vh', background: '#f9fafb', display: 'flex', flexDirection: 'column'}}>
         <div style={{padding: '10px 20px', background: 'white', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'flex-end'}}>
            {user ? (
              <UserBar user={user} logout={logout} />
            ) : (
-             <button onClick={() => setSelectedDoctorId("LOGIN_MODE")} className="btn secondary">
+             <button onClick={() => navigate("/login")} className="btn secondary">
                Zaloguj się
              </button>
            )}
         </div>
-        <DoctorList onSelectDoctor={setSelectedDoctorId} />
+        <DoctorList onSelectDoctor={(id) => navigate(`/doctor/${id}`)} />
         <NotificationToast />
       </div>
     );
   }
 
-  if (selectedDoctorId === "LOGIN_MODE") {
+  // 3. TRYB LOGOWANIA
+  if (mode === 'login') {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', flexDirection: 'column', position: 'relative' }}>
          <button 
-           onClick={() => setSelectedDoctorId(null)} 
+           onClick={() => navigate("/")} 
            style={{position: 'absolute', top: 20, left: 20, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5}}
          >
            <ArrowLeft size={20}/> Wróć do listy
@@ -396,129 +401,131 @@ export default function App() {
     );
   }
 
-  return (
-    <div className="calendar">
-      {user ? (
-        <UserBar user={user} logout={logout} />
-      ) : (
-        <div style={{padding: '10px 20px', background: '#f3f4f6', borderBottom: '1px solid #ddd', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-          <span>Tryb Gościa (Tylko podgląd)</span>
-          <div style={{display: 'flex', gap: 10}}>
-             <button onClick={() => setSelectedDoctorId("LOGIN_MODE")} className="btn secondary">Zaloguj się</button>
-             <button onClick={() => setSelectedDoctorId(null)} className="btn secondary">Inny lekarz</button>
+  // 4. WIDOK KALENDARZA
+  if (mode === 'calendar') {
+    return (
+      <div className="calendar">
+        {user ? (
+          <UserBar user={user} logout={logout} />
+        ) : (
+          <div style={{padding: '10px 20px', background: '#f3f4f6', borderBottom: '1px solid #ddd', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+            <span>Tryb Gościa (Tylko podgląd)</span>
+            <div style={{display: 'flex', gap: 10}}>
+               <button onClick={() => navigate("/login")} className="btn secondary">Zaloguj się</button>
+               <button onClick={() => navigate("/")} className="btn secondary">Inny lekarz</button>
+            </div>
           </div>
-        </div>
-      )}
-
-      <div className="calendarTopBar">
-        {!isDoctor && (
-          <button 
-            onClick={() => setSelectedDoctorId(null)} 
-            className="btn secondary" 
-            style={{marginRight: 10, padding: "8px 12px"}}
-            title="Wróć do listy lekarzy"
-          >
-            <ArrowLeft size={20} />
-          </button>
         )}
 
-        <div className="title" style={{display: 'flex', alignItems: 'center', gap: 10}}>
-          <CalendarIcon size={20} />
-          {isDoctor ? "Mój Grafik" : "Kalendarz Wizyt"} — tydzień{" "}
-          {format(weekStart, "dd.MM")}–{format(addWeeks(weekStart, 1), "dd.MM")}
-        </div>
-
-        {isDoctor && (
-          <div style={{position: 'relative'}}>
+        <div className="calendarTopBar">
+          {!isDoctor && (
             <button 
+              onClick={() => navigate("/")} 
               className="btn secondary" 
-              onClick={() => setShowAnnouncementInput(!showAnnouncementInput)}
-              title="Wyślij ogłoszenie do pacjentów"
+              style={{marginRight: 10, padding: "8px 12px"}}
+              title="Wróć do listy lekarzy"
             >
-              <Megaphone size={20} />
+              <ArrowLeft size={20} />
             </button>
-            
-            {showAnnouncementInput && (
-              <div style={{
-                position: 'absolute', 
-                top: '110%', 
-                left: '50%', 
-                transform: 'translateX(-50%)',
-                background: 'white', 
-                padding: 15, 
-                boxShadow: '0 4px 20px rgba(0,0,0,0.15)', 
-                borderRadius: 8, 
-                zIndex: 100,
-                width: 300
-              }}>
-                <h5 style={{margin: '0 0 10px 0'}}>Wyślij powiadomienie</h5>
-                <textarea 
-                  value={announcement}
-                  onChange={e => setAnnouncement(e.target.value)}
-                  placeholder="np. Będę 15 min później..."
-                  style={{width: '100%', height: 60, marginBottom: 10, padding: 5}}
-                />
-                <button onClick={handleSendAnnouncement} className="btn" style={{width: '100%'}}>Wyślij</button>
-              </div>
-            )}
+          )}
+
+          <div className="title" style={{display: 'flex', alignItems: 'center', gap: 10}}>
+            <CalendarIcon size={20} />
+            {isDoctor ? "Mój Grafik" : "Kalendarz Wizyt"} — tydzień{" "}
+            {format(weekStart, "dd.MM")}–{format(addWeeks(weekStart, 1), "dd.MM")}
           </div>
+
+          {/* PRZYCISK POWIADOMIEŃ (Dla Lekarza) */}
+          {isDoctor && (
+            <div style={{position: 'relative'}}>
+              <button 
+                className="btn secondary" 
+                onClick={() => setShowAnnouncementInput(!showAnnouncementInput)}
+                title="Wyślij ogłoszenie do pacjentów"
+              >
+                <Megaphone size={20} />
+              </button>
+              
+              {showAnnouncementInput && (
+                <div style={{
+                  position: 'absolute', 
+                  top: '110%', 
+                  left: '50%', 
+                  transform: 'translateX(-50%)',
+                  background: 'white', 
+                  padding: 15, 
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.15)', 
+                  borderRadius: 8, 
+                  zIndex: 100,
+                  width: 300
+                }}>
+                  <h5 style={{margin: '0 0 10px 0'}}>Wyślij powiadomienie</h5>
+                  <textarea 
+                    value={announcement}
+                    onChange={e => setAnnouncement(e.target.value)}
+                    placeholder="np. Będę 15 min później..."
+                    style={{width: '100%', height: 60, marginBottom: 10, padding: 5}}
+                  />
+                  <button onClick={handleSendAnnouncement} className="btn" style={{width: '100%'}}>Wyślij</button>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="btn secondary" onClick={() => setAnchorDate(d => subWeeks(d, 1))}>
+              <ChevronLeft size={20} />
+            </button>
+            <button className="btn secondary" onClick={() => setAnchorDate(new Date())}>
+              Dziś
+            </button>
+            <button className="btn secondary" onClick={() => setAnchorDate(d => addWeeks(d, 1))}>
+              <ChevronRight size={20} />
+            </button>
+          </div>
+        </div>
+
+        {infoMessage && (
+          <InfoModal
+            message={infoMessage}
+            onClose={() => setInfoMessage(null)}
+          />
         )}
 
-        <div style={{ display: "flex", gap: 8 }}>
-          <button className="btn secondary" onClick={() => setAnchorDate(d => subWeeks(d, 1))}>
-            <ChevronLeft size={20} />
-          </button>
-          <button className="btn secondary" onClick={() => setAnchorDate(new Date())}>
-            Dziś
-          </button>
-          <button className="btn secondary" onClick={() => setAnchorDate(d => addWeeks(d, 1))}>
-            <ChevronRight size={20} />
-          </button>
+        <CalendarWeek
+          weekStart={weekStart}
+          consultations={doctorConsultations}
+          now={now}
+          visibleHours={6}
+          onAddConsultation={isPatient ? handleAddConsultation : undefined}
+          onCancelConsultation={handleCancelConsultation}
+          availabilityRules={doctorAvailability}
+          onAddAvailability={isDoctor ? handleAddAvailability : undefined}
+          onRemoveAvailability={isDoctor ? handleRemoveAvailability : undefined}
+          absences={doctorAbsences}
+          onAddAbsence={isDoctor ? handleAddAbsence : undefined}
+          onRemoveAbsence={isDoctor ? handleRemoveAbsence : undefined}
+          currentUserId={user?.uid}
+        />
+
+        {isPatient && (
+          <Cart
+            items={cartItems}
+            onRemove={handleRemoveFromCart}
+            onCheckout={handleCheckout}
+          />
+        )}
+
+        <div style={{ marginTop: 40, borderTop: "2px solid #eee", width: "100%", gridColumn: "1 / -1" }}>
+          <ReviewsSection doctorId={targetDoctorId} />
         </div>
+        
+        <NotificationToast />
       </div>
+    );
+  }
 
-      {infoMessage && (
-        <InfoModal
-          message={infoMessage}
-          onClose={() => setInfoMessage(null)}
-        />
-      )}
-
-      <CalendarWeek
-        weekStart={weekStart}
-        consultations={doctorConsultations}
-        now={now}
-        visibleHours={6}
-        
-        onAddConsultation={isPatient ? handleAddConsultation : undefined}
-        onCancelConsultation={handleCancelConsultation}
-        
-        // === POPRAWKA 2: Przekazujemy przefiltrowane dane ===
-        availabilityRules={doctorAvailability}
-        onAddAvailability={isDoctor ? handleAddAvailability : undefined}
-        onRemoveAvailability={isDoctor ? handleRemoveAvailability : undefined}
-        
-        absences={doctorAbsences}
-        onAddAbsence={isDoctor ? handleAddAbsence : undefined}
-        onRemoveAbsence={isDoctor ? handleRemoveAbsence : undefined}
-        
-        currentUserId={user?.uid}
-      />
-
-      {isPatient && (
-        <Cart
-          items={cartItems}
-          onRemove={handleRemoveFromCart}
-          onCheckout={handleCheckout}
-        />
-      )}
-
-      <div style={{ marginTop: 40, borderTop: "2px solid #eee", width: "100%", gridColumn: "1 / -1" }}>
-        <ReviewsSection doctorId={targetDoctorId} />
-      </div>
-      <NotificationToast />
-    </div>
-  );
+  return null;
 }
 
 // UserBar bez zmian
@@ -561,7 +568,6 @@ function UserBar({ user, logout }: { user: any, logout: () => void }) {
             <LogOut size={16} /> Wyloguj
           </button>
         </div>
-        <NotificationToast />
       </div>
       {isEditing && <EditProfileModal onClose={() => setIsEditing(false)} />}
     </>

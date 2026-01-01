@@ -12,15 +12,11 @@ type Props = {
   totalSlots: number;
   consultations: Consultation[];
   now: Date;
-  
-  // ZMIANA: opcjonalna funkcja (Pacjent ma, Lekarz nie)
-  onAddConsultation?: (c: Consultation) => void; 
-  
+  onAddConsultation?: (c: Consultation) => void;
   onCancelConsultation: (id: string) => void;
   availabilityRules: AvailabilityRule[];
   absences: Absence[];
-
-  currentUserId?: string;
+  currentUserId?: string; // ID aktualnie zalogowanego usera (może być undefined u gościa)
 };
 
 export function DayColumn({
@@ -52,14 +48,12 @@ export function DayColumn({
 
   const dayAbsent = isDayAbsent(day, absences);
 
-  // ❗ slot pod myszą
+  // --- LOGIKA INTERAKCJI MYSZĄ (Zaznaczanie) ---
   function getSlotFromMouse(e: React.MouseEvent) {
     if (!colRef.current) return null;
-
     const rect = colRef.current.getBoundingClientRect();
     const y = e.clientY - rect.top;
     const slot = Math.floor(y / 60);
-
     if (slot < 0 || slot >= totalSlots) return null;
     return slot;
   }
@@ -67,38 +61,26 @@ export function DayColumn({
   function isSlotFree(slot: number) {
     const slotStartMin = slot * 30;
     const slotEndMin = slotStartMin + 30;
-
     return !dayEvents.some(ev => {
       const start = parseISO(ev.start);
       const end = parseISO(ev.end);
-
       const evStart = start.getHours() * 60 + start.getMinutes();
       const evEnd = end.getHours() * 60 + end.getMinutes();
-
       return slotStartMin < evEnd && slotEndMin > evStart;
     });
   }
 
   function handleMouseDown(e: React.MouseEvent) {
-    // ZMIANA: Jeśli nie przekazano funkcji dodawania (np. widok lekarza), 
-    // to blokujemy interakcję zaznaczania.
+    // Tylko pacjent (który ma onAddConsultation) może zaznaczać
     if (!onAddConsultation) return;
-
     if (dayAbsent) return;
 
     const slot = getSlotFromMouse(e);
     if (slot === null) return;
-
     if (!isSlotFree(slot)) return;
 
     const minutesFromStart = slot * 30;
-
-    const available = isSlotInAvailability(
-      day,
-      minutesFromStart,
-      availabilityRules
-    );
-
+    const available = isSlotInAvailability(day, minutesFromStart, availabilityRules);
     if (!available) return;
 
     setSelectionStart(slot);
@@ -106,26 +88,20 @@ export function DayColumn({
     setIsDragging(true);
   }
 
-
   function handleMouseMove(e: React.MouseEvent) {
     if (!isDragging || selectionStart === null) return;
-
     const slot = getSlotFromMouse(e);
     if (slot === null) return;
     if (!isSlotFree(slot)) return;
-
     setSelectionEnd(slot);
   }
 
   function handleMouseUp() {
     if (!isDragging) return;
-
     setIsDragging(false);
-
     if (selectionStart !== null && selectionEnd !== null) {
       const from = Math.min(selectionStart, selectionEnd);
       const to = Math.max(selectionStart, selectionEnd);
-
       setModalRange({ start: from, end: to });
       setModalOpen(true);
     }
@@ -134,7 +110,6 @@ export function DayColumn({
   return (
     <div
       ref={colRef}
-      // Opcjonalnie: można dodać styl cursor: default jeśli brak onAddConsultation
       className={clsx("dayCol", isToday && "todayCol", dayAbsent && "slotAbsent")}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
@@ -142,13 +117,10 @@ export function DayColumn({
       onMouseLeave={handleMouseUp}
       style={{ cursor: onAddConsultation ? "pointer" : "default" }}
     >
-      {/* siatka */}
+      {/* SIATKA TŁA */}
       {Array.from({ length: totalSlots }).map((_, i) => {
         const minutesFromStart = i * 30;
-
-        const unavailable =
-          dayAbsent || !isSlotInAvailability(day, minutesFromStart, availabilityRules);
-
+        const unavailable = dayAbsent || !isSlotInAvailability(day, minutesFromStart, availabilityRules);
         return (
           <div
             key={i}
@@ -158,33 +130,39 @@ export function DayColumn({
         );
       })}
 
-      {/* wizyty */}
+      {/* WIZYTY */}
       {dayEvents.map(c => {
-        const isPatientView = !!onAddConsultation; 
-        const isMyConsultation = (c as any).patientId === currentUserId;
-        const isForeign = isPatientView && !isMyConsultation;
+        // === POPRAWKA BEZPIECZEŃSTWA ===
+        
+        // 1. Czy to moja wizyta? (Jako pacjenta)
+        const isMine = currentUserId && (c as any).patientId === currentUserId;
+        
+        // 2. Czy jestem lekarzem (właścicielem kalendarza)?
+        const isDoctorOwner = currentUserId && c.doctorId === currentUserId;
 
-        return(
+        // Jeśli NIE jest moja I NIE jestem lekarzem => to jest "obca" (anonimowa)
+        // (Działa to też dla Gościa, bo wtedy currentUserId jest undefined, więc oba warunki są false)
+        const isForeign = !isMine && !isDoctorOwner;
+
+        return (
           <EventBlock
             key={c.id}
             consultation={c}
             dayStart={dayStart}
             now={now}
+            // Anulować możemy tylko jeśli nie jest obca
             onCancel={isForeign ? undefined : () => onCancelConsultation(c.id)}
-            isForeign={isForeign}
+            isForeign={isForeign} 
           />
         );
       })}
 
-      {/* zaznaczenie */}
+      {/* SELEKCJA (Niebieski klocek podczas ciągnięcia) */}
       {selectionStart !== null && selectionEnd !== null && (
-        <SelectionBlock
-          startSlot={selectionStart}
-          endSlot={selectionEnd}
-        />
+        <SelectionBlock startSlot={selectionStart} endSlot={selectionEnd} />
       )}
 
-      {/* ZMIANA: Modal renderujemy tylko jeśli mamy funkcję onAddConsultation */}
+      {/* MODAL REZERWACJI */}
       {modalOpen && modalRange && onAddConsultation && (
         <BookingModal
           day={day}

@@ -3,6 +3,7 @@ import { initializeApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import { ref, set } from "firebase/database";
 import { db } from "../../firebaseConfig";
+import { SPECIALIZATIONS } from "../../utils/specializations";
 
 // Konfiguracja do drugiego App (skopiuj ze swojego firebaseConfig.ts)
 const firebaseConfig = {
@@ -21,7 +22,8 @@ export function CreateDoctorForm() {
   const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [specialization, setSpecialization] = useState("Internista");
+  const [specialization, setSpecialization] = useState(SPECIALIZATIONS[10]);
+  const [city, setCity] = useState("");
   
   // ZMIANA: String zamiast pliku
   const [avatarUrl, setAvatarUrl] = useState(""); 
@@ -57,6 +59,7 @@ export function CreateDoctorForm() {
         firstName,
         lastName,
         specialization,
+        city,
         avatarUrl: finalAvatarUrl,
         createdAt: new Date().toISOString()
       });
@@ -67,6 +70,7 @@ export function CreateDoctorForm() {
       setPassword("");
       setFirstName("");
       setLastName("");
+      setCity("");
       setAvatarUrl("");
       
     } catch (error: any) {
@@ -96,10 +100,20 @@ export function CreateDoctorForm() {
         </div>
 
         <input 
-          placeholder="Specjalizacja" 
-          value={specialization} onChange={e => setSpecialization(e.target.value)} 
+          placeholder="Miasto (np. Warszawa)" 
+          value={city} onChange={e => setCity(e.target.value)} 
           required style={{ padding: 8 }} 
         />
+
+        <select 
+          value={specialization} 
+          onChange={e => setSpecialization(e.target.value)}
+          style={{ padding: 8 }}
+        >
+          {SPECIALIZATIONS.map(spec => (
+            <option key={spec} value={spec}>{spec}</option>
+          ))}
+        </select>
 
         {/* INPUT TEKSTOWY */}
         <div style={{display: 'flex', flexDirection: 'column', gap: 5}}>

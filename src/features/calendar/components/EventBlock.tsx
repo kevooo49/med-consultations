@@ -27,7 +27,6 @@ export function EventBlock({
   onCancel,
   isForeign
 }: Props) {
-  // 1. Obliczenia geometryczne
   const start = parseISO(consultation.start);
   const end = parseISO(consultation.end);
 
@@ -48,7 +47,7 @@ export function EventBlock({
         style={{
           top: topPx,
           height: heightPx,
-          background: "repeating-linear-gradient(45deg, #f3f4f6, #f3f4f6 10px, #e5e7eb 10px, #e5e7eb 20px)", // Szary wzorek
+          background: "repeating-linear-gradient(45deg, #f3f4f6, #f3f4f6 10px, #e5e7eb 10px, #e5e7eb 20px)",
           border: "1px solid #d1d5db",
           color: "#9ca3af",
           cursor: "default",
@@ -99,15 +98,11 @@ export function EventBlock({
       <div
         ref={ref}
         className={clsx("eventBlock", isPast && "eventPast", isCancelled && "eventCancelled")}
-        // Tutaj był błąd - scaliłem wszystko w jeden obiekt style
         style={{ 
             top: topPx, 
             height: heightPx, 
-            // Logika koloru tła (draft vs normalny)
             background: consultation.status === 'draft' ? '#fff7ed' : bg, 
-            // Logika obramowania
             border: consultation.status === 'draft' ? '1px solid #fdba74' : '1px solid transparent',
-            // Logika kursora
             cursor: onCancel ? "pointer" : "default"
         }}
         onMouseEnter={() => setHover(true)}
@@ -125,9 +120,16 @@ export function EventBlock({
           {consultation.patient?.fullName ?? "Rezerwacja"} • {consultation.type}
         </div>
 
-        {/* TOOLTIP */}
+        {/* TOOLTIP ZE SZCZEGÓŁAMI */}
         {hover && (
-          <div className={clsx("tooltip", showBelow && "tooltipBelow")} style={{zIndex: 100}}>
+          <div 
+            className={clsx("tooltip", showBelow && "tooltipBelow")} 
+            style={{
+                zIndex: 100, 
+                // WAŻNE: Odblokowujemy klikanie w linki wewnątrz tooltipa
+                pointerEvents: 'auto' 
+            }}
+          >
             <div style={{ fontWeight: 700, marginBottom: 6 }}>Szczegóły wizyty</div>
             <div><b>Pacjent:</b> {consultation.patient?.fullName ?? "—"}</div>
             <div><b>Typ:</b> {consultation.type}</div>
@@ -139,13 +141,33 @@ export function EventBlock({
               </div>
             )}
 
+            {/* === SEKCJA DOKUMENTÓW (NOWE) === */}
+            {consultation.documents && consultation.documents.length > 0 && (
+               <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid rgba(255,255,255,0.2)' }}>
+                  <div style={{fontWeight: 'bold', marginBottom: 2}}>Dokumentacja:</div>
+                  {consultation.documents.map((doc, i) => (
+                    <div key={i} style={{marginBottom: 2}}>
+                       <a 
+                         href={doc.url} 
+                         target="_blank" 
+                         rel="noopener noreferrer"
+                         style={{ color: '#93c5fd', textDecoration: 'underline' }}
+                         onClick={(e) => e.stopPropagation()} // Zapobiegamy otwarciu modala anulowania
+                       >
+                         🔗 {doc.name}
+                       </a>
+                    </div>
+                  ))}
+               </div>
+            )}
+
             <div style={{ marginTop: 6, opacity: 0.85 }}>
               <b>Czas trwania:</b> {heightMinutes} min
             </div>
             
             {onCancel && (
                <div style={{ marginTop: 8, fontSize: '0.75rem', color: '#ef4444', fontWeight: 'bold' }}>
-                 Kliknij, aby odwołać
+                 Kliknij kafelek, aby odwołać
                </div>
             )}
           </div>
