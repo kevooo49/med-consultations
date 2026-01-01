@@ -42,12 +42,14 @@ export type AvailabilityRule = {
   to?: string;
   weekdays?: number[];
   timeRanges: TimeRange[];
+  doctorId: string;
 };
 
 export type Absence = {
   id: string;
   from: string; // yyyy-MM-dd
   to: string;   // yyyy-MM-dd
+  doctorId: string;
 };
 
 export type UserRole = "patient" | "doctor" | "admin";
@@ -59,4 +61,7 @@ export interface AppUser {
   firstName?: string;
   lastName?: string;
   isBanned?: boolean;
+
+  specialization?: string;
+  avatarUrl?: string;
 }
