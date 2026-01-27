@@ -8,7 +8,6 @@ import {
 import { auth } from "../../firebaseConfig";
 
 export function PersistenceSettings() {
-  // POPRAWKA: Stan początkowy ładujemy z localStorage (lub domyślnie LOCAL)
   const [currentMode, setCurrentMode] = useState(() => {
     return localStorage.getItem("persistenceMode") || "LOCAL";
   });
@@ -22,7 +21,7 @@ export function PersistenceSettings() {
     try {
       await setPersistence(auth, persistenceType);
       
-      // POPRAWKA: Zapisujemy wybór do localStorage, żeby przetrwał odświeżenie
+      // Zapisujemy wybór do localStorage, żeby przetrwał odświeżenie
       localStorage.setItem("persistenceMode", mode);
       setCurrentMode(mode);
       

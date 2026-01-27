@@ -3,7 +3,7 @@ import type { Consultation, AvailabilityRule, Absence } from "../types";
 import { dayHeaderLabel, getDaysOfWeek, SLOT_MINUTES } from "../utils/calendarMath";
 import { TimeGutter } from "./TimeGutter";
 import { DayColumn } from "./DayColumn";
-import { NowIndicator } from "./NowIndicator";
+// import { NowIndicator } from "./NowIndicator";
 import { useEffect, useRef, useState } from "react";
 import { AvailabilityModal } from "./AvailabilityModal";
 import { AvailabilityList } from "./AvailabilityList";
@@ -125,7 +125,7 @@ export function CalendarWeek({
               currentUserId={currentUserId}
             />
           ))}
-          <NowIndicator weekDays={days} totalSlots={fullDaySlots} now={now} />
+          {/*<NowIndicator weekDays={days} totalSlots={fullDaySlots} now={now} />*/}
         </div>
       </div>
 
@@ -134,7 +134,21 @@ export function CalendarWeek({
         <AvailabilityModal
           absences={absences}
           onSave={(rule) => {
-            onAddAvailability(rule);
+            // Tutaj czyścimy dane zanim trafią do App.tsx.
+            // 1. Kopiujemy obiekt, żeby pozbyć się referencji.
+            // 2. Usuwamy pola undefined (przerwy), których Firebase nie przyjmuje.
+            
+            const cleanRule: any = { ...rule };
+
+            // Jeśli breakStart/End są undefined lub puste, usuwamy je całkowicie z obiektu
+            if (!cleanRule.breakStart) delete cleanRule.breakStart;
+            if (!cleanRule.breakEnd) delete cleanRule.breakEnd;
+            
+            // Ostateczne czyszczenie "na twardo"
+            const payload = JSON.parse(JSON.stringify(cleanRule));
+
+            console.log("Saving availability payload:", payload);
+            onAddAvailability(payload);
             setAvailabilityModalOpen(false);
           }}
           onClose={() => setAvailabilityModalOpen(false)}
@@ -144,7 +158,9 @@ export function CalendarWeek({
       {absenceModalOpen && onAddAbsence && (
         <AbsenceModal
           onSave={(a) => {
-            onAddAbsence(a);
+             // Tu też dla bezpieczeństwa czyścimy
+            const payload = JSON.parse(JSON.stringify(a));
+            onAddAbsence(payload);
             setAbsenceModalOpen(false);
           }}
           onClose={() => setAbsenceModalOpen(false)}

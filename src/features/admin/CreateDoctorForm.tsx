@@ -1,11 +1,9 @@
 import { useState } from "react";
 import { initializeApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword, signOut } from "firebase/auth";
-import { ref, set } from "firebase/database";
-import { db } from "../../firebaseConfig";
 import { SPECIALIZATIONS } from "../../utils/specializations";
+import type { Backend } from "../../services/backend";
 
-// Konfiguracja do drugiego App (skopiuj ze swojego firebaseConfig.ts)
 const firebaseConfig = {
   apiKey: "AIzaSyCOBUTHY9Fgq8b-hj8u0kN5w7EUytGiB14",
   authDomain: "med-consultations.firebaseapp.com",
@@ -17,7 +15,11 @@ const firebaseConfig = {
   databaseURL: "https://med-consultations-default-rtdb.europe-west1.firebasedatabase.app/"
 };
 
-export function CreateDoctorForm() {
+interface Props {
+  backend: Backend;
+}
+
+export function CreateDoctorForm({ backend }: Props) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -25,7 +27,6 @@ export function CreateDoctorForm() {
   const [specialization, setSpecialization] = useState(SPECIALIZATIONS[10]);
   const [city, setCity] = useState("");
   
-  // ZMIANA: String zamiast pliku
   const [avatarUrl, setAvatarUrl] = useState(""); 
   
   const [loading, setLoading] = useState(false);
@@ -42,18 +43,18 @@ export function CreateDoctorForm() {
       const secondaryAuth = getAuth(secondaryApp);
       const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
       const newUid = userCredential.user.uid;
-      await signOut(secondaryAuth); // Sprzątanie
+      await signOut(secondaryAuth);
 
       // 2. Obsługa zdjęcia (Logika fallbacku)
       let finalAvatarUrl = avatarUrl;
       
-      // Jeśli admin nie podał linku, generujemy awatar z inicjałów
       if (!finalAvatarUrl) {
         finalAvatarUrl = `https://ui-avatars.com/api/?background=random&color=fff&name=${firstName}+${lastName}`;
       }
 
       // 3. Zapis do Bazy Danych
-      await set(ref(db, `users/${newUid}`), {
+      await backend.createUser({
+        uid: newUid,
         email,
         role: "doctor",
         firstName,

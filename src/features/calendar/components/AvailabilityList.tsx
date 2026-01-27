@@ -6,38 +6,26 @@ type Props = {
 };
 
 export function AvailabilityList({ rules, onRemove }: Props) {
-  if (rules.length === 0) {
-    return (
-      <div style={{ padding: 12, fontSize: 13, opacity: 0.7 }}>
-        Brak zdefiniowanych dostępności
-      </div>
-    );
+  if (!rules || rules.length === 0) {
+    return <div style={{ padding: 12, opacity: 0.7 }}>Brak reguł dostępności</div>;
   }
 
   return (
     <div style={{ padding: 12 }}>
-      <div style={{ fontWeight: 600, marginBottom: 8 }}>
-        Dostępności lekarza
-      </div>
-
+      <strong>Twoje reguły</strong>
       {rules.map(rule => (
-        <div
-          key={rule.id}
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            padding: "6px 0",
-            borderBottom: "1px solid #e5e7eb",
-            fontSize: 13,
-          }}
-        >
-          <div>{formatRule(rule)}</div>
-
-          <button
-            className="btn secondary"
-            onClick={() => onRemove(rule.id)}
-          >
+        <div key={rule.id} style={{ 
+          display: "flex", 
+          justifyContent: "space-between", 
+          alignItems: "center",
+          padding: "8px 0",
+          borderBottom: "1px solid #eee",
+          fontSize: "0.9rem"
+        }}>
+          <div>
+            {formatRule(rule)}
+          </div>
+          <button className="btn secondary" onClick={() => onRemove(rule.id)} style={{ marginLeft: 10 }}>
             Usuń
           </button>
         </div>
@@ -47,17 +35,16 @@ export function AvailabilityList({ rules, onRemove }: Props) {
 }
 
 function formatRule(rule: AvailabilityRule): string {
-  const hours = rule.timeRanges
-    .map(r => `${r.start}–${r.end}`)
-    .join(", ");
+  // Używamy pustej tablicy, jeśli timeRanges nie istnieje
+  const ranges = rule.timeRanges || [];
+  const hours = ranges.map(r => `${r.start}-${r.end}`).join(", ");
 
   if (rule.type === "single") {
-    return `Jednorazowa: ${rule.date}, ${hours}`;
+    return `📅 ${rule.date || "Brak daty"} (${hours})`;
+  } else {
+    const daysMap = ["Nd", "Pn", "Wt", "Śr", "Cz", "Pt", "Sb"];
+    // weekdays też może być undefined
+    const daysStr = (rule.weekdays || []).map(d => daysMap[d]).join(" ");
+    return `🔁 ${rule.from || "?"} - ${rule.to || "?"} [${daysStr}] (${hours})`;
   }
-
-  const days = rule.weekdays
-    ?.map(d => ["Nd", "Pn", "Wt", "Śr", "Cz", "Pt", "Sb"][d])
-    .join(" ");
-
-  return `Cykliczna: ${rule.from} – ${rule.to}, ${days}, ${hours}`;
 }

@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
-import { ref, get, remove } from "firebase/database";
-import { db } from "../../firebaseConfig";
 import { Trash2, MessageSquare } from "lucide-react";
 import { format } from "date-fns";
+// 1. Importujemy interfejs Backend
+import type { Backend } from "../../services/backend";
 
-// Typ pomocniczy (rozszerzona opinia o ID lekarza)
 type AdminReview = {
   reviewId: string;
   doctorId: string;
@@ -14,20 +13,21 @@ type AdminReview = {
   date: string;
 };
 
-export function AdminReviewsPanel() {
+// 2. Przyjmujemy backend w propsach
+export function AdminReviewsPanel({ backend }: { backend: Backend }) {
   const [allReviews, setAllReviews] = useState<AdminReview[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchReviews = async () => {
     setLoading(true);
     try {
-      // 1. Pobierz WSZYSTKIE opinie z bazy
-      const snapshot = await get(ref(db, "reviews"));
-      if (snapshot.exists()) {
-        const data = snapshot.val(); // Struktura: { doctorId: { reviewId: {...} } }
+      // 3. Używamy abstrakcji backendu zamiast bezpośredniego strzału do Firebase
+      const data = await backend.getAllReviews();
+      
+      if (data) {
         const flatList: AdminReview[] = [];
 
-        // 2. Spłaszczamy strukturę drzewiastą do płaskiej listy
+        // Logika spłaszczania zostaje ta sama, bo oba backendy zwracają podobną strukturę
         Object.keys(data).forEach((doctorId) => {
           const docReviews = data[doctorId];
           Object.keys(docReviews).forEach((reviewId) => {
@@ -58,16 +58,17 @@ export function AdminReviewsPanel() {
 
   useEffect(() => {
     fetchReviews();
-  }, []);
+    // odświeżenie jak zmieni się backend
+  }, [backend]);
 
   const handleDelete = async (doctorId: string, reviewId: string) => {
     if (window.confirm("Czy na pewno chcesz usunąć ten komentarz (jako Admin)?")) {
-      await remove(ref(db, `reviews/${doctorId}/${reviewId}`));
+      
+      // 4. Usuwanie przez backend
+      await backend.deleteReview(doctorId, reviewId);
+      
       // Odśwież listę lokalnie
       setAllReviews(prev => prev.filter(r => r.reviewId !== reviewId));
-      
-      // Uwaga: Średnia ocena lekarza przeliczy się automatycznie przy następnym
-      // wejściu na listę lekarzy (zgodnie z naszą logiką client-side calculation).
     }
   };
 
@@ -78,6 +79,7 @@ export function AdminReviewsPanel() {
       <h3><MessageSquare size={20} style={{verticalAlign: 'middle', marginRight: 8}}/>Moderacja Komentarzy</h3>
       <p style={{fontSize: '0.9rem', color: '#666', marginBottom: 15}}>
         Jako administrator możesz usuwać naruszające regulamin opinie ze wszystkich profili.
+        (Tryb bazy: <strong>{localStorage.getItem('backendType') || 'firebase'}</strong>)
       </p>
 
       {allReviews.length === 0 ? (

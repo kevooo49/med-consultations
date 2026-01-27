@@ -16,7 +16,7 @@ type Props = {
   onCancelConsultation: (id: string) => void;
   availabilityRules: AvailabilityRule[];
   absences: Absence[];
-  currentUserId?: string; // ID aktualnie zalogowanego usera (może być undefined u gościa)
+  currentUserId?: string; 
 };
 
 export function DayColumn({
@@ -48,7 +48,9 @@ export function DayColumn({
 
   const dayAbsent = isDayAbsent(day, absences);
 
-  // --- LOGIKA INTERAKCJI MYSZĄ (Zaznaczanie) ---
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+  // oblicza nad którym slotem jest myszka
   function getSlotFromMouse(e: React.MouseEvent) {
     if (!colRef.current) return null;
     const rect = colRef.current.getBoundingClientRect();
@@ -58,6 +60,16 @@ export function DayColumn({
     return slot;
   }
 
+  // Sprawdza, czy slot zaczyna się w przeszłości względem 'now'
+  function isSlotInPast(slot: number) {
+    const slotTime = new Date(day);
+    slotTime.setHours(0, 0, 0, 0);
+    slotTime.setMinutes(slot * 30);
+
+    return slotTime < now;
+  }
+
+  // sprawdza czy slot jest wolny i blokuje kolizje
   function isSlotFree(slot: number) {
     const slotStartMin = slot * 30;
     const slotEndMin = slotStartMin + 30;
@@ -70,15 +82,38 @@ export function DayColumn({
     });
   }
 
+  // sprawdza czy zakres slotów jest wolny
+  function isRangeFree(start: number, end: number) {
+    const low = Math.min(start, end);
+    const high = Math.max(start, end);
+
+    for (let i = low; i <= high; i++) {
+      if (!isSlotFree(i)) return false;
+    }
+    return true;
+  }
+  // sprawdza czy zakres slotów jest dostępny w grafiku lekarza
+  function isRangeAvailable(start: number, end: number) {
+    const low = Math.min(start, end);
+    const high = Math.max(start, end);
+
+    for (let i = low; i <= high; i++) {
+      const minutesFromStart = i * 30;
+      if (!isSlotInAvailability(day, minutesFromStart, availabilityRules)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   function handleMouseDown(e: React.MouseEvent) {
-    // Tylko pacjent (który ma onAddConsultation) może zaznaczać
     if (!onAddConsultation) return;
     if (dayAbsent) return;
 
     const slot = getSlotFromMouse(e);
     if (slot === null) return;
     if (!isSlotFree(slot)) return;
-
+    if (isSlotInPast(slot)) return;
     const minutesFromStart = slot * 30;
     const available = isSlotInAvailability(day, minutesFromStart, availabilityRules);
     if (!available) return;
@@ -92,14 +127,45 @@ export function DayColumn({
     if (!isDragging || selectionStart === null) return;
     const slot = getSlotFromMouse(e);
     if (slot === null) return;
-    if (!isSlotFree(slot)) return;
+    
+    // Jeśli użytkownik próbuje przeciągnąć myszkę nad zajętym slotem,
+    // ignorujemy ten ruch (niepozwalamy "przeskoczyć" wizyty).
+    if (!isRangeFree(selectionStart, slot)) {
+        return; 
+    }
+
+    if (!isRangeAvailable(selectionStart, slot)) return;
+
+    if (isSlotInPast(slot)) return;
+    
     setSelectionEnd(slot);
   }
 
   function handleMouseUp() {
     if (!isDragging) return;
-    setIsDragging(false);
+    setIsDragging(false);    
     if (selectionStart !== null && selectionEnd !== null) {
+      // sprawdzamy jeszcze raz cały zakres przed otwarciem modala
+      if (!isRangeFree(selectionStart, selectionEnd)) {
+          alert("Wybrany zakres koliduje z inną wizytą!");
+          setSelectionStart(null);
+          setSelectionEnd(null);
+          return;
+      }
+      // sprawdzamy dostępność w grafiku lekarza
+      if (!isRangeAvailable(selectionStart, selectionEnd)) {
+          alert("Lekarz nie przyjmuje w tych godzinach!");
+          setSelectionStart(null);
+          setSelectionEnd(null);
+          return;
+      }
+      // sprawdzamy czy początek zakresu nie jest w przeszłości
+      const startSlot = Math.min(selectionStart, selectionEnd);
+      if (isSlotInPast(startSlot)) {
+          alert("Nie można rezerwować wizyt w przeszłości!");
+          setSelectionStart(null); setSelectionEnd(null); return;
+      }
+
       const from = Math.min(selectionStart, selectionEnd);
       const to = Math.max(selectionStart, selectionEnd);
       setModalRange({ start: from, end: to });
@@ -115,7 +181,7 @@ export function DayColumn({
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
-      style={{ cursor: onAddConsultation ? "pointer" : "default" }}
+      style={{ cursor: onAddConsultation ? "pointer" : "default", position: 'relative' }}
     >
       {/* SIATKA TŁA */}
       {Array.from({ length: totalSlots }).map((_, i) => {
@@ -132,16 +198,8 @@ export function DayColumn({
 
       {/* WIZYTY */}
       {dayEvents.map(c => {
-        // === POPRAWKA BEZPIECZEŃSTWA ===
-        
-        // 1. Czy to moja wizyta? (Jako pacjenta)
         const isMine = currentUserId && (c as any).patientId === currentUserId;
-        
-        // 2. Czy jestem lekarzem (właścicielem kalendarza)?
         const isDoctorOwner = currentUserId && c.doctorId === currentUserId;
-
-        // Jeśli NIE jest moja I NIE jestem lekarzem => to jest "obca" (anonimowa)
-        // (Działa to też dla Gościa, bo wtedy currentUserId jest undefined, więc oba warunki są false)
         const isForeign = !isMine && !isDoctorOwner;
 
         return (
@@ -150,19 +208,29 @@ export function DayColumn({
             consultation={c}
             dayStart={dayStart}
             now={now}
-            // Anulować możemy tylko jeśli nie jest obca
             onCancel={isForeign ? undefined : () => onCancelConsultation(c.id)}
             isForeign={isForeign} 
           />
         );
       })}
 
-      {/* SELEKCJA (Niebieski klocek podczas ciągnięcia) */}
+      {/* SELEKCJA */}
       {selectionStart !== null && selectionEnd !== null && (
         <SelectionBlock startSlot={selectionStart} endSlot={selectionEnd} />
       )}
+      
+      {isToday && (
+        <div 
+          className="nowIndicator" 
+          style={{ top: nowMinutes * 2 }}
+          title={`Teraz: ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`}
+        >
+          <div className="nowDot" />
+          <div className="nowLine" />
+        </div>
+      )}
 
-      {/* MODAL REZERWACJI */}
+      {/* MODAL */}
       {modalOpen && modalRange && onAddConsultation && (
         <BookingModal
           day={day}
@@ -183,6 +251,33 @@ export function DayColumn({
           }}
         />
       )}
+      
+      <style>{`
+        .nowIndicator {
+          position: absolute;
+          left: 0;
+          right: 0;
+          z-index: 50; /* Musi być nad siatką, ale pod modalem */
+          pointer-events: none;
+          display: flex;
+          align-items: center;
+        }
+        .nowDot {
+          width: 7px;
+          height: 7px;
+          background: #ea4335;
+          border-radius: 50%;
+          position: absolute;
+          left: -5px; /* Wystaje lekko poza kolumnę */
+          box-shadow: 0 0 4px rgba(0,0,0,0.2);
+        }
+        .nowLine {
+          height: 1px;
+          background: #ea4335;
+          width: 100%;
+          box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+      `}</style>
     </div>
   );
 }

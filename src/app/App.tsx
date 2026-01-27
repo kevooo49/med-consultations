@@ -9,14 +9,15 @@ import { consultationConflictsWithAvailability } from "../features/calendar/util
 import { InfoModal } from "../features/calendar/components/InfoModal";
 import { Cart } from "../features/calendar/components/Cart";
 
-/* === BACKENDS === */
+/* === BACKENDY === */
 import type { BackendType } from "../services/backend";
 import { firebaseBackend } from "../services/firebaseBackend";
 import { localBackend } from "../services/localBackend";
+import type { Backend } from "../services/backend";
 
-/* === AUTH & ADMIN === */
+/* === AUTH I ADMIN === */
 import { useAuth } from "../context/AuthContext";
-import { AuthForm } from "../features/calendar/components/AuthForm"; // Upewnij się co do ścieżki
+import { AuthForm } from "../features/calendar/components/AuthForm";
 import { UserList } from "../features/admin/UserList";
 import { CreateDoctorForm } from "../features/admin/CreateDoctorForm";
 import { PersistenceSettings } from "../features/admin/PersistenceSettings";
@@ -24,13 +25,12 @@ import { DoctorList } from "../features/doctors/DoctorList";
 import { ReviewsSection } from "../features/reviews/ReviewsSection";
 import { AdminReviewsPanel } from "../features/admin/AdminReviewsPanel";
 
-/* === ICONS & UI === */
+/* === INTERFEJS === */
 import { LogOut, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Settings, ArrowLeft, Megaphone } from "lucide-react";
-import { EditProfileModal } from "../features/calendar/components/EditProfileModal"; // Upewnij się co do ścieżki
+import { EditProfileModal } from "../features/calendar/components/EditProfileModal";
 
-/* === NOTIFICATIONS === */
-import { sendNotificationToUser } from "../services/notificationService";
-import { NotificationToast } from "../features/calendar/components/NotificationToast"; // Upewnij się co do ścieżki
+/* === POWIADOMIENIA === */
+import { NotificationToast } from "../features/calendar/components/NotificationToast";
 
 /* === ROUTING === */
 import { Routes, Route, useNavigate, useMatch, Navigate } from "react-router-dom";
@@ -109,18 +109,21 @@ function MainLayout({ mode }: { mode: "list" | "login" | "calendar" | "admin" })
   const backend = backendType === "firebase" ? firebaseBackend : localBackend;
   const weekStart = useMemo(() => getWeekStart(anchorDate), [anchorDate]);
 
-  /* =====================
-      HELPERS - ROLE
-  ===================== */
+  // Reset anchorDate do dzisiaj przy zmianie trybu lub lekarza
+  useEffect(() => {
+    if (mode === 'calendar') {
+      setAnchorDate(new Date());
+    }
+  }, [mode, urlDoctorId]);
+
+  // ROLE UŻYTKOWNIKA
   const isDoctor = user?.role === 'doctor';
   const isPatient = user?.role === 'patient';
-  const isAdmin = user?.role === 'admin';
+  // const isAdmin = user?.role === 'admin';
 
-  /* =====================
-      DERIVED DATA
-  ===================== */
+  // Filtracja danych według wybranego lekarza
   const targetDoctorId = selectedDoctorId || "none";
-
+  // Filtrowanie konsultacji (Izolacja danych)
   const doctorConsultations = useMemo(
     () => consultations.filter(c => c.doctorId === targetDoctorId),
     [consultations, targetDoctorId]
@@ -136,14 +139,12 @@ function MainLayout({ mode }: { mode: "list" | "login" | "calendar" | "admin" })
     () => absences.filter(a => a.doctorId === targetDoctorId),
     [absences, targetDoctorId]
   );
-
+  // Elementy w koszyku (tylko dla pacjentów)
   const cartItems = useMemo(() => 
     doctorConsultations.filter(c => c.status === "draft" && (c as any).patientId === user?.uid),
   [doctorConsultations, user]);
 
-  /* =====================
-      LISTENERS
-  ===================== */
+  // Listenery do backendu (ładowanie danych)
   useEffect(() => {
     // Admin i lista lekarzy nie potrzebują ładować szczegółów kalendarza
     if (mode === 'admin') return;
@@ -163,7 +164,20 @@ function MainLayout({ mode }: { mode: "list" | "login" | "calendar" | "admin" })
   ===================== */
   async function handleAddAvailability(rule: AvailabilityRule) {
     if (!isDoctor) return; 
-    await backend.addAvailability({ ...rule, doctorId: user?.uid });
+    
+    try {
+        // Tworzymy obiekt z ID lekarza
+        const payload = { ...rule, doctorId: user?.uid };
+        
+        const cleanPayload = JSON.parse(JSON.stringify(payload));
+        
+        console.log("Wysyłam dostępność:", cleanPayload); // Debug w konsoli
+        await backend.addAvailability(cleanPayload);
+        
+    } catch (e: any) {
+        console.error("Błąd dodawania dostępności:", e);
+        alert("Wystąpił błąd przy zapisie: " + e.message);
+    }
   }
 
   async function handleRemoveAvailability(id: string) {
@@ -180,7 +194,7 @@ function MainLayout({ mode }: { mode: "list" | "login" | "calendar" | "admin" })
          const patientId = (c as any).patientId;
          if (patientId) {
             const dateStr = format(new Date(c.start), "dd.MM HH:mm");
-            await sendNotificationToUser(
+            await backend.sendNotification(
                patientId,
                `Lekarz zmienił grafik. Twoja wizyta (${dateStr}) została odwołana.`,
                doctorName,
@@ -196,6 +210,9 @@ function MainLayout({ mode }: { mode: "list" | "login" | "calendar" | "admin" })
 
   async function handleAddAbsence(absence: Absence) {
     if (!isDoctor) return;
+    const payload = { ...absence, doctorId: user?.uid };
+    const cleanPayload = JSON.parse(JSON.stringify(payload));
+
     let cancelledAny = false;
     const conflicts = doctorConsultations.filter(c =>
       c.status === "booked" && consultationConflictsWithAbsence(c, absence)
@@ -207,7 +224,7 @@ function MainLayout({ mode }: { mode: "list" | "login" | "calendar" | "admin" })
         const patientId = (c as any).patientId;
         if (patientId) {
            const dateStr = format(new Date(c.start), "dd.MM HH:mm");
-           await sendNotificationToUser(
+           await backend.sendNotification(
               patientId,
               `Lekarz dodał nieobecność. Twoja wizyta z dnia ${dateStr} została odwołana.`,
               doctorName,
@@ -217,7 +234,7 @@ function MainLayout({ mode }: { mode: "list" | "login" | "calendar" | "admin" })
         return backend.updateConsultation(c.id, { status: "cancelled" });
       }));
     }
-    await backend.addAbsence({ ...absence, doctorId: user?.uid });
+    await backend.addAbsence(cleanPayload);
     if (cancelledAny) setInfoMessage("Dodano absencję. Kolidujące wizyty odwołane.");
   }
 
@@ -238,7 +255,9 @@ function MainLayout({ mode }: { mode: "list" | "login" | "calendar" | "admin" })
         gender: "Other"
       }
     };
-    await backend.addConsultation(consultationWithPatientId as Consultation);
+    // Czyścimy payload
+    const cleanPayload = JSON.parse(JSON.stringify(consultationWithPatientId));
+    await backend.addConsultation(cleanPayload);
   }
 
   async function handleCancelConsultation(id: string) {
@@ -253,12 +272,12 @@ function MainLayout({ mode }: { mode: "list" | "login" | "calendar" | "admin" })
       }
     }
 
-    if (isDoctor || isAdmin) {
+    if (isDoctor || user?.role === 'admin') {
        const patientId = (targetConsultation as any).patientId;
        if (patientId) {
           const doctorName = `${user?.firstName} ${user?.lastName}`;
           const dateStr = format(new Date(targetConsultation.start), "dd.MM HH:mm");
-          await sendNotificationToUser(
+          await backend.sendNotification(
              patientId,
              `Twoja wizyta z dnia ${dateStr} została odwołana.`,
              doctorName,
@@ -277,7 +296,7 @@ function MainLayout({ mode }: { mode: "list" | "login" | "calendar" | "admin" })
     await Promise.all(cartItems.map(c => backend.updateConsultation(c.id, { status: "booked" })));
   }
 
-  // Funkcja Ogłoszenia (Megafon) - PRZENIESIONA I ZINTEGROWANA
+  // Funkcja Ogłoszenia (Megafon)
   const handleSendAnnouncement = async () => {
     if (!announcement.trim()) return;
     const doctorName = user?.firstName ? `${user.firstName} ${user.lastName}` : "Lekarz";
@@ -296,7 +315,7 @@ function MainLayout({ mode }: { mode: "list" | "login" | "calendar" | "admin" })
 
     // 2. Wyślij do każdego
     const promises = Array.from(uniquePatients).map(pid => 
-      sendNotificationToUser(pid, announcement, doctorName, "info")
+      backend.sendNotification(pid, announcement, doctorName, "info")
     );
 
     await Promise.all(promises);
@@ -317,16 +336,13 @@ function MainLayout({ mode }: { mode: "list" | "login" | "calendar" | "admin" })
 
   // 1. ADMIN
   if (mode === 'admin') {
-    // POPRAWKA BEZPIECZEŃSTWA:
-    // Jeśli użytkownik nie jest zalogowany (!user) LUB nie ma roli admin -> Wyrzuć na stronę główną.
-    // Używamy <Navigate> zamiast return null/div, żeby od razu zmienić adres URL.
     if (!user || user.role !== 'admin') {
       return <Navigate to="/" replace />;
     }
     
     return (
       <div className="calendar" style={{height: '100vh', display: 'flex', flexDirection: 'column'}}>
-        <UserBar user={user} logout={logout} />
+        <UserBar user={user} logout={logout} backend={backend} />
         <div style={{ padding: 40, overflowY: "auto" }}>
           <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20}}>
              <h1>Panel Administratora</h1>
@@ -347,18 +363,16 @@ function MainLayout({ mode }: { mode: "list" | "login" | "calendar" | "admin" })
             <div>
                <h4>Zarejestrowani Użytkownicy</h4>
                <div style={{ background: "#f9f9f9", border: "1px solid #ddd", borderRadius: 8 }}>
-                 <UserList />
+                 <UserList backend={backend} />
                </div>
             </div>
             <div>
                <h4>Kreator Kont Lekarskich</h4>
-               <CreateDoctorForm />
+               <CreateDoctorForm backend={backend}/>
             </div>
           </div>
 
-          {/* NOWOŚĆ: Panel do usuwania komentarzy (Wymaganie projektowe) */}
-          <AdminReviewsPanel />
-
+          <AdminReviewsPanel backend={backend}/>
           <PersistenceSettings />
         </div>
       </div>
@@ -371,15 +385,15 @@ function MainLayout({ mode }: { mode: "list" | "login" | "calendar" | "admin" })
       <div style={{minHeight: '100vh', background: '#f9fafb', display: 'flex', flexDirection: 'column'}}>
         <div style={{padding: '10px 20px', background: 'white', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'flex-end'}}>
            {user ? (
-             <UserBar user={user} logout={logout} />
+             <UserBar user={user} logout={logout} backend={backend} />
            ) : (
              <button onClick={() => navigate("/login")} className="btn secondary">
                Zaloguj się
              </button>
            )}
         </div>
-        <DoctorList onSelectDoctor={(id) => navigate(`/doctor/${id}`)} />
-        <NotificationToast />
+        <DoctorList onSelectDoctor={(id) => navigate(`/doctor/${id}`)} backend={backend} />
+        <NotificationToast backend={backend}/>
       </div>
     );
   }
@@ -396,7 +410,7 @@ function MainLayout({ mode }: { mode: "list" | "login" | "calendar" | "admin" })
          </button>
          <h1>Portal Medyczny</h1>
          <AuthForm />
-         <NotificationToast />
+         <NotificationToast backend={backend}/>
       </div>
     );
   }
@@ -406,7 +420,7 @@ function MainLayout({ mode }: { mode: "list" | "login" | "calendar" | "admin" })
     return (
       <div className="calendar">
         {user ? (
-          <UserBar user={user} logout={logout} />
+          <UserBar user={user} logout={logout} backend={backend} />
         ) : (
           <div style={{padding: '10px 20px', background: '#f3f4f6', borderBottom: '1px solid #ddd', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
             <span>Tryb Gościa (Tylko podgląd)</span>
@@ -517,10 +531,10 @@ function MainLayout({ mode }: { mode: "list" | "login" | "calendar" | "admin" })
         )}
 
         <div style={{ marginTop: 40, borderTop: "2px solid #eee", width: "100%", gridColumn: "1 / -1" }}>
-          <ReviewsSection doctorId={targetDoctorId} />
+          {urlDoctorId && (<ReviewsSection doctorId={urlDoctorId} backend={backend}/>)}
         </div>
         
-        <NotificationToast />
+        <NotificationToast backend={backend}/>
       </div>
     );
   }
@@ -528,8 +542,7 @@ function MainLayout({ mode }: { mode: "list" | "login" | "calendar" | "admin" })
   return null;
 }
 
-// UserBar bez zmian
-function UserBar({ user, logout }: { user: any, logout: () => void }) {
+function UserBar({ user, logout, backend }: { user: any, logout: () => void, backend: Backend }) {
   const [isEditing, setIsEditing] = useState(false);
   const roleLabels: Record<string, string> = { patient: 'Pacjent', doctor: 'Lekarz', admin: 'Admin' };
   const roleColors: Record<string, string> = { patient: '#f0f2f5', doctor: '#e3f2fd', admin: '#ffebee' };
@@ -569,7 +582,7 @@ function UserBar({ user, logout }: { user: any, logout: () => void }) {
           </button>
         </div>
       </div>
-      {isEditing && <EditProfileModal onClose={() => setIsEditing(false)} />}
+      {isEditing && <EditProfileModal onClose={() => setIsEditing(false)} backend={backend} />}
     </>
   );
 }

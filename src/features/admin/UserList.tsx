@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
-import { ref, get, update } from "firebase/database";
-import { db } from "../../firebaseConfig";
 import type { AppUser } from "../calendar/types";
+import type { Backend } from "../../services/backend";
 
-export function UserList() {
+interface Props {
+  backend: Backend;
+}
+
+export function UserList({ backend }: Props) {
   const [users, setUsers] = useState<AppUser[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -11,16 +14,9 @@ export function UserList() {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const snapshot = await get(ref(db, "users"));
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        // Zamiana obiektu {uid: {data}} na tablicę [{uid, ...data}]
-        const usersArray = Object.entries(data).map(([uid, val]: [string, any]) => ({
-          uid,
-          ...val,
-        }));
-        setUsers(usersArray);
-      }
+      const data = await backend.getUsers();
+      // Backend zwraca tablicę
+      setUsers(data);
     } catch (error) {
       console.error("Błąd pobierania użytkowników:", error);
     } finally {
@@ -30,19 +26,17 @@ export function UserList() {
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [backend]); // Odśwież jak zmieni się backend
 
-  // Funkcja banowania (Zadanie 4 [cite: 110-111])
+  // Funkcja banowania
   const toggleBan = async (uid: string, currentBanStatus?: boolean) => {
     try {
       // Jeśli jest zbanowany -> false (odbanuj), jeśli nie -> true (zbanuj)
       const newStatus = !currentBanStatus; 
+
+      await backend.updateUser(uid, { isBanned: newStatus });
       
-      await update(ref(db, `users/${uid}`), {
-        isBanned: newStatus
-      });
-      
-      // Odświeżamy listę lokalnie (optymistycznie)
+      // Odświeżamy listę lokalnie
       setUsers(prev => prev.map(u => 
         u.uid === uid ? { ...u, isBanned: newStatus } : u
       ));

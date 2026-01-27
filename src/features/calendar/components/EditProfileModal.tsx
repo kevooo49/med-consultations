@@ -1,19 +1,16 @@
 import { useState } from "react";
-import { ref, update } from "firebase/database";
-import { db } from "../../../firebaseConfig";
 import { useAuth } from "../../../context/AuthContext";
 import { X } from "lucide-react";
 import { SPECIALIZATIONS } from "../../../utils/specializations";
+import type { Backend } from "../../../services/backend";
 
-export function EditProfileModal({ onClose }: { onClose: () => void }) {
+export function EditProfileModal({ onClose, backend }: { onClose: () => void, backend: Backend }) {
   const { user } = useAuth();
   
   const [firstName, setFirstName] = useState(user?.firstName || "");
   const [lastName, setLastName] = useState(user?.lastName || "");
   const [specialization, setSpecialization] = useState(user?.specialization || "");
   const [city, setCity] = useState(user?.city || "");
-  
-  // ZMIANA: Edycja URL jako string
   const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl || "");
   const [loading, setLoading] = useState(false);
 
@@ -27,16 +24,16 @@ export function EditProfileModal({ onClose }: { onClose: () => void }) {
         firstName,
         lastName,
         city,
-        avatarUrl // Zapisujemy stringa z inputa
+        avatarUrl
       };
 
       if (user.role === 'doctor') {
         updates.specialization = specialization;
       }
 
-      await update(ref(db, `users/${user.uid}`), updates);
+      await backend.updateUser(user.uid, updates);
       
-      // Reload, żeby odświeżyć kontekst
+      // Reload, żeby odświeżyć kontekst Auth
       window.location.reload(); 
       
     } catch (error) {
@@ -48,7 +45,7 @@ export function EditProfileModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="modalOverlay">
-      <div className="modalContent" style={{width: 450}}>
+      <div className="modalContent" style={{width: 450, padding: 20}}>
         <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20}}>
            <h3>Edytuj Profil</h3>
            <button onClick={onClose} style={{background: 'none', border: 'none', cursor: 'pointer'}}><X /></button>
@@ -57,11 +54,9 @@ export function EditProfileModal({ onClose }: { onClose: () => void }) {
         <form onSubmit={handleSave} style={{display: 'flex', flexDirection: 'column', gap: 15}}>
           
           <div style={{textAlign: 'center'}}>
-             {/* Podgląd */}
              <img 
                src={avatarUrl || `https://ui-avatars.com/api/?name=${firstName}+${lastName}`} 
                onError={(e) => {
-                   // Fallback jeśli link jest zły
                    (e.target as HTMLImageElement).src = "https://via.placeholder.com/100?text=Brak";
                }}
                style={{width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', border: '2px solid #ddd'}}

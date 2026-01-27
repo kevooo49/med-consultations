@@ -1,12 +1,12 @@
 import { useEffect, useState, useMemo } from "react";
-import { ref, get } from "firebase/database";
-import { db } from "../../firebaseConfig";
 import type { AppUser } from "../calendar/types";
 import { Star, Search, MapPin, Filter } from "lucide-react";
 import { SPECIALIZATIONS } from "../../utils/specializations";
+import type { Backend } from "../../services/backend";
 
 interface Props {
   onSelectDoctor: (doctorId: string) => void;
+  backend: Backend;
 }
 
 type DocStats = {
@@ -16,7 +16,7 @@ type DocStats = {
 
 type SortOption = "rating" | "alphabetical";
 
-export function DoctorList({ onSelectDoctor }: Props) {
+export function DoctorList({ onSelectDoctor, backend }: Props) {
   const [doctors, setDoctors] = useState<AppUser[]>([]);
   const [stats, setStats] = useState<Record<string, DocStats>>({});
   const [loading, setLoading] = useState(true);
@@ -28,73 +28,69 @@ export function DoctorList({ onSelectDoctor }: Props) {
 
   useEffect(() => {
     const fetchData = async () => {
+      setLoading(true);
       try {
-        // Pobieranie userów
-        const usersSnap = await get(ref(db, "users"));
-        const allUsers: AppUser[] = usersSnap.exists() 
-          ? Object.entries(usersSnap.val()).map(([uid, val]: [string, any]) => ({ uid, ...val }))
-          : [];
-        setDoctors(allUsers.filter(u => u.role === "doctor"));
+        const doctorsList = await backend.getDoctors();
+        setDoctors(doctorsList);
 
-        // Pobieranie statystyk (ocen)
-        const reviewsSnap = await get(ref(db, "reviews"));
+        const reviewsData = await backend.getAllReviews();
+        
+        // Przeliczanie statystyk
         const newStats: Record<string, DocStats> = {};
-        if (reviewsSnap.exists()) {
-          const reviewsData = reviewsSnap.val();
+        if (reviewsData) {
           Object.keys(reviewsData).forEach(docId => {
-             const docReviews = Object.values(reviewsData[docId]) as any[];
+             const docReviewsObj = reviewsData[docId];
+             if (!docReviewsObj) return;
+
+             const docReviews = Object.values(docReviewsObj) as any[];
              const count = docReviews.length;
              const sum = docReviews.reduce((acc, r) => acc + (r.rating || 0), 0);
-             newStats[docId] = { count, rating: count > 0 ? sum / count : 0 };
+             
+             newStats[docId] = { 
+               count, 
+               rating: count > 0 ? sum / count : 0 
+             };
           });
         }
         setStats(newStats);
-      } catch (e) { console.error(e); } 
-      finally { setLoading(false); }
+
+      } catch (e) { 
+        console.error(e); 
+      } finally { 
+        setLoading(false); 
+      }
     };
     fetchData();
-  }, []);
+  }, [backend]); // odświeżamy, gdy zmienia się backend
 
-  // === LOGIKA FILTROWANIA I SORTOWANIA ===
+  // === LOGIKA FILTROWANIA ===
   const filteredDoctors = useMemo(() => {
     return doctors
       .filter(doc => {
-        // 1. Filtr Specjalizacji
         if (selectedSpec && doc.specialization !== selectedSpec) return false;
-        
-        // 2. Wyszukiwanie (Nazwisko lub Miasto)
         const query = searchQuery.toLowerCase();
         const fullName = `${doc.firstName} ${doc.lastName}`.toLowerCase();
         const city = (doc.city || "").toLowerCase();
-        
-        // Jeśli query puste -> true. Jeśli wpisano coś -> szukamy w nazwie LUB mieście
         return fullName.includes(query) || city.includes(query);
       })
       .sort((a, b) => {
-        // 3. Sortowanie
         if (sortBy === "rating") {
           const statA = stats[a.uid]?.rating || 0;
           const statB = stats[b.uid]?.rating || 0;
-          // Malejąco po ocenie
           return statB - statA;
         } else {
-          // Alfabetycznie po nazwisku
           return (a.lastName || "").localeCompare(b.lastName || "");
         }
       });
   }, [doctors, stats, searchQuery, selectedSpec, sortBy]);
-
 
   if (loading) return <div style={{padding: 40, textAlign: 'center'}}>Ładowanie listy lekarzy...</div>;
 
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: "40px 20px" }}>
       <h1 style={{ textAlign: "center", marginBottom: 10 }}>Znajdź Specjalistę</h1>
-      
-      {/* === PASEK FILTRÓW (Używa nowych klas CSS) === */}
+
       <div className="filterBar">
-        
-        {/* Wyszukiwarka */}
         <div className="searchWrapper">
           <Search size={18} style={{ position: "absolute", left: 10, color: "#9ca3af" }} />
           <input 
@@ -105,7 +101,6 @@ export function DoctorList({ onSelectDoctor }: Props) {
           />
         </div>
 
-        {/* Filtr Specjalizacji */}
         <div className="selectWrapper">
           <select 
             value={selectedSpec} 
@@ -118,7 +113,6 @@ export function DoctorList({ onSelectDoctor }: Props) {
           </select>
         </div>
 
-        {/* Sortowanie */}
         <div className="sortWrapper">
           <span style={{ fontSize: '0.9rem', color: '#6b7280', display: 'flex', alignItems: 'center', gap: 5 }}>
              <Filter size={16} /> Sortuj:
@@ -126,7 +120,7 @@ export function DoctorList({ onSelectDoctor }: Props) {
           <select 
             value={sortBy} 
             onChange={e => setSortBy(e.target.value as SortOption)}
-            style={{ padding: "8px 12px", background: "#f9fafb" }}
+            style={{ padding: "8px 12px", background: "#f9fafb", borderRadius: 8, border: "1px solid #d1d5db" }}
           >
             <option value="rating">Wg oceny</option>
             <option value="alphabetical">Alfabetycznie</option>
@@ -134,10 +128,11 @@ export function DoctorList({ onSelectDoctor }: Props) {
         </div>
       </div>
 
-      {/* === LISTA WYNIKÓW === */}
       {filteredDoctors.length === 0 ? (
         <div style={{textAlign: 'center', padding: 40, color: '#6b7280'}}>
            Nie znaleziono lekarzy spełniających kryteria.
+           <br/>
+           <small>(Jeśli jesteś w trybie Local JSON, upewnij się, że dodałeś lekarzy w Panelu Admina)</small>
         </div>
       ) : (
         <div style={{ 
@@ -182,14 +177,12 @@ export function DoctorList({ onSelectDoctor }: Props) {
                   {doc.specialization || "Lekarz"}
                 </div>
 
-                {/* MIASTO (Jeśli jest) */}
                 {doc.city && (
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, color: '#6b7280', fontSize: '0.85rem', marginBottom: 12 }}>
                     <MapPin size={14} /> {doc.city}
                   </div>
                 )}
 
-                {/* OCENY */}
                 <div style={{ 
                    display: 'inline-flex', alignItems: 'center', gap: 6, 
                    background: '#fffbeb', padding: '6px 12px', borderRadius: 20, 

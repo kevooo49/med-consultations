@@ -1,28 +1,53 @@
-import { useEffect, useState, useMemo } from "react"; // Dodano useMemo
+import { useEffect, useState, useMemo } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { addReview, deleteReview, listenReviews, replyToReview, type Review } from "../../services/reviewsService";
 import { format } from "date-fns";
-import { Star } from "lucide-react"; // Import ikonki
+import { Star, Lock } from "lucide-react";
+import type { Backend, Review } from "../../services/backend";
 
 interface Props {
   doctorId: string;
+  backend: Backend;
 }
 
-export function ReviewsSection({ doctorId }: Props) {
+export function ReviewsSection({ doctorId, backend }: Props) {
   const { user } = useAuth();
   const [reviews, setReviews] = useState<Review[]>([]);
   
+  // czy pacjent ma historię wizyt u tego lekarza
+  const [hasVisitHistory, setHasVisitHistory] = useState(false);
+
   const [newRating, setNewRating] = useState(5);
   const [newText, setNewText] = useState("");
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
 
+  // 1. Pobieranie opinii
   useEffect(() => {
-    const unsub = listenReviews(doctorId, setReviews);
-    return () => unsub();
-  }, [doctorId]);
+    const unsubscribe = backend.listenReviews(doctorId, setReviews);
+    return () => unsubscribe();
+  }, [doctorId, backend]);
 
-  // === OBLICZANIE ŚREDNIEJ ===
+  // 2. Sprawdzanie uprawnień
+  useEffect(() => {
+    if (!user || user.role !== 'patient') {
+      setHasVisitHistory(false);
+      return;
+    }
+
+    // Pobieramy konsultacje, żeby sprawdzić historię
+    const unsub = backend.listenConsultations((allConsultations) => {
+      // Szukamy jakiejkolwiek wizyty tego pacjenta u tego lekarza
+      const visited = allConsultations.some(c => 
+        c.doctorId === doctorId && 
+        c.status === 'booked' && 
+        (c as any).patientId === user.uid
+      );
+      setHasVisitHistory(visited);
+    });
+
+    return () => unsub();
+  }, [user, doctorId, backend]);
+
   const averageRating = useMemo(() => {
     if (reviews.length === 0) return 0;
     const sum = reviews.reduce((acc, r) => acc + r.rating, 0);
@@ -30,13 +55,22 @@ export function ReviewsSection({ doctorId }: Props) {
   }, [reviews]);
 
   const alreadyReviewed = user && reviews.some(r => r.patientId === user.uid);
+  const isPatient = user?.role === 'patient';
+  const isDoctor = user?.role === 'doctor';
+  const isAdmin = user?.role === 'admin';
+  const isBanned = user?.isBanned;
 
   const handleAddReview = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+
+    if (!doctorId || doctorId === "undefined") {
+      alert("Błąd: Nieprawidłowe ID lekarza.");
+      return;
+    }
+
     try {
-      // Wywołujemy funkcję, która teraz tylko dodaje do reviews (bez edycji usera)
-      await addReview(doctorId, {
+      await backend.addReview(doctorId, {
         patientId: user.uid,
         patientEmail: user.email,
         rating: newRating,
@@ -52,21 +86,16 @@ export function ReviewsSection({ doctorId }: Props) {
   };
 
   const handleReply = async (reviewId: string) => {
-    await replyToReview(doctorId, reviewId, replyText);
+    await backend.replyToReview(doctorId, reviewId, replyText);
     setReplyingTo(null);
     setReplyText("");
   };
 
   const handleDelete = async (reviewId: string) => {
     if (confirm("Czy na pewno usunąć ten komentarz?")) {
-      await deleteReview(doctorId, reviewId);
+      await backend.deleteReview(doctorId, reviewId);
     }
   };
-
-  const isPatient = user?.role === 'patient';
-  const isDoctor = user?.role === 'doctor';
-  const isAdmin = user?.role === 'admin';
-  const isBanned = user?.isBanned;
 
   return (
     <div style={{ padding: "20px 40px", maxWidth: 900, margin: "0 auto" }}>
@@ -84,8 +113,29 @@ export function ReviewsSection({ doctorId }: Props) {
          </div>
       </div>
 
-      {/* FORMULARZ (Bez zmian w logice) */}
-      {isPatient && !isBanned && !alreadyReviewed && (
+      {/* BLOKADA DLA NIE-PACJENTÓW (Brak historii wizyt) */}
+      {isPatient && !isBanned && !alreadyReviewed && !hasVisitHistory && (
+         <div style={{ 
+            background: "#f3f4f6", 
+            padding: 15, 
+            borderRadius: 8, 
+            marginBottom: 20, 
+            color: "#6b7280",
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            border: "1px solid #e5e7eb"
+         }}>
+            <Lock size={20} />
+            <div>
+               <strong>Nie możesz jeszcze dodać opinii.</strong>
+               <div style={{fontSize: "0.9rem"}}>Musisz odbyć wizytę u tego lekarza, aby móc ocenić jego usługi.</div>
+            </div>
+         </div>
+      )}
+
+      {/* FORMULARZ (Widoczny tylko jeśli masz historię wizyt) */}
+      {isPatient && !isBanned && !alreadyReviewed && hasVisitHistory && (
         <form onSubmit={handleAddReview} style={{ background: "#f9f9f9", padding: 15, borderRadius: 8, marginBottom: 20 }}>
           <h4>Oceń wizytę</h4>
           <div style={{ marginBottom: 10 }}>
@@ -127,7 +177,7 @@ export function ReviewsSection({ doctorId }: Props) {
 
       {/* Lista opinii */}
       <div style={{ display: "flex", flexDirection: "column", gap: 15 }}>
-        {reviews.length === 0 && <p>Brak opinii. Bądź pierwszy!</p>}
+        {reviews.length === 0 && <p>Brak opinii.</p>}
         
         {reviews.map(r => (
           <div key={r.id} style={{ border: "1px solid #eee", padding: 15, borderRadius: 8, background: "white" }}>

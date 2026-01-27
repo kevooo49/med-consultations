@@ -33,7 +33,7 @@ export function Cart({ items, onRemove, onCheckout }: Props) {
   const handlePay = async () => {
     setIsProcessing(true);
 
-    // 1. Symulacja opóźnienia (2 sekundy) - tu "łączymy się z bankiem"
+    // 1. Symulacja opóźnienia (2 sekundy)
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
     // 2. Wywołanie zapisu w bazie (funkcja z App.tsx)
@@ -80,7 +80,6 @@ export function Cart({ items, onRemove, onCheckout }: Props) {
 
                   <div className="cartItemDetails">
                     <div className="cartItemType">{c.type}</div>
-                    {/* Opcjonalnie: pokazanie ceny jednostkowej */}
                   </div>
 
                   <div className="cartItemPrice">
@@ -124,7 +123,7 @@ export function Cart({ items, onRemove, onCheckout }: Props) {
 
               <button
                 className="btn primary summaryCheckout"
-                onClick={handlePay} // Zmieniono na naszą funkcję z loaderem
+                onClick={handlePay}
                 disabled={isProcessing}
                 style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}
               >

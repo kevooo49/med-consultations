@@ -13,12 +13,16 @@ export function AbsenceModal({ onSave, onClose }: Props) {
   function handleSave() {
     if (!from || !to) return;
 
-    onSave({
-      id: crypto.randomUUID(),
+    const payload: Absence = {
+      id: "",
+      doctorId: "",
       from,
       to,
-    });
+    };
 
+    const cleanPayload = JSON.parse(JSON.stringify(payload));
+
+    onSave(cleanPayload);
     onClose();
   }
 

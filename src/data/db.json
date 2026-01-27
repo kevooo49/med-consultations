@@ -1,31 +1,154 @@
 {
-  "doctors": [
-    { "id": "d1", "name": "dr Anna Kowalska", "specialization": "kardiolog" }
+  "users": [
+    {
+      "uid": "wK87VRXlNkdhE4J4DgFjCU6gqL43",
+      "email": "firanka@doc.pl",
+      "role": "doctor",
+      "firstName": "Miłosz",
+      "lastName": "Firanka",
+      "specialization": "Psychiatra",
+      "city": "Gdynia",
+      "avatarUrl": "https://static.wikia.nocookie.net/lgbt-characters/images/c/c4/Asher_Wolke.png",
+      "createdAt": "2026-01-25T15:27:28.215Z",
+      "id": "wK87VRXlNkdhE4J4DgFjCU6gqL43"
+    },
+    {
+      "uid": "CbDKoURJ5QgrirNybGXToIhIQY83",
+      "email": "rozga@doc.pl",
+      "role": "doctor",
+      "firstName": "Patrycja",
+      "lastName": "Rózga",
+      "specialization": "Endokrynolog",
+      "city": "Pawłowice",
+      "avatarUrl": "https://ui-avatars.com/api/?background=random&color=fff&name=Patrycja+Rózga",
+      "createdAt": "2026-01-25T15:36:18.400Z",
+      "id": "CbDKoURJ5QgrirNybGXToIhIQY83"
+    },
+    {
+      "uid": "CpaXLslf6wgf0RWS3hJc7okfVB32",
+      "email": "poranek@doc.pl",
+      "role": "doctor",
+      "firstName": "Paweł",
+      "lastName": "Poranek",
+      "specialization": "Anestezjolog",
+      "city": "Warszawa",
+      "avatarUrl": "https://ui-avatars.com/api/?background=random&color=fff&name=Paweł+Poranek",
+      "createdAt": "2026-01-25T16:36:17.555Z",
+      "id": "CpaXLslf6wgf0RWS3hJc7okfVB32"
+    }
   ],
   "consultations": [
     {
-      "id": "c1",
-      "doctorId": "d1",
-      "start": "2025-12-29T08:00:00",
-      "end": "2025-12-29T10:00:00",
+      "id": "acb0ab84-14aa-47d1-bb79-5f8dac5d651b",
+      "doctorId": "CpaXLslf6wgf0RWS3hJc7okfVB32",
+      "start": "2026-01-27T07:30:00.000Z",
+      "end": "2026-01-27T08:30:00.000Z",
       "type": "first_visit",
       "status": "booked",
-      "patient": { "fullName": "Jan Nowak", "gender": "M", "age": 34 },
-      "notes": "Bóle w klatce piersiowej",
-      "documents": []
+      "price": {
+        "net": 203.25,
+        "vat": 46.75,
+        "gross": 250
+      },
+      "patient": {
+        "fullName": "Kevin Stuka",
+        "age": 30,
+        "gender": "Other"
+      },
+      "notes": "Ból brzucha",
+      "documents": [],
+      "patientId": "n71hUhxyWhRTctRUUhKoOnOFTND2"
     },
     {
-      "id": "c2",
-      "doctorId": "d1",
-      "start": "2025-12-30T16:30:00",
-      "end": "2025-12-30T17:00:00",
-      "type": "control",
-      "status": "booked",
-      "patient": { "fullName": "Maria Wiśniewska", "gender": "F", "age": 58 },
-      "notes": "Kontrola po lekach",
-      "documents": []
+      "id": "956bad59-de17-4405-9f8d-400780274af3",
+      "doctorId": "wK87VRXlNkdhE4J4DgFjCU6gqL43",
+      "start": "2026-01-27T07:00:00.000Z",
+      "end": "2026-01-27T07:30:00.000Z",
+      "type": "control_visit",
+      "status": "cancelled",
+      "price": {
+        "net": 121.95,
+        "vat": 28.05,
+        "gross": 150
+      },
+      "patient": {
+        "fullName": "bfdgdfg",
+        "age": 30,
+        "gender": "Other"
+      },
+      "notes": "ffdgfdg",
+      "documents": [],
+      "patientId": "YWrMEgeIX4TKTQL7Gy5qhgYqEuq1"
     }
   ],
-  "availability": [],
-  "absences": []
+  "availability": [
+    {
+      "id": "e95d3ced-f660-4e0e-84a5-ddc0de6dba8f",
+      "type": "recurring",
+      "from": "2026-01-01",
+      "to": "2026-02-28",
+      "weekdays": [
+        1,
+        2,
+        5
+      ],
+      "timeRanges": [
+        {
+          "start": "08:00",
+          "end": "12:30"
+        },
+        {
+          "start": "14:00",
+          "end": "16:30"
+        }
+      ],
+      "doctorId": "CpaXLslf6wgf0RWS3hJc7okfVB32"
+    },
+    {
+      "id": "5417bf80-16f4-4945-afe6-2959c2ecaa91",
+      "type": "recurring",
+      "from": "2026-01-01",
+      "to": "2026-03-31",
+      "weekdays": [
+        1,
+        2
+      ],
+      "timeRanges": [
+        {
+          "start": "08:00",
+          "end": "12:30"
+        }
+      ],
+      "doctorId": "wK87VRXlNkdhE4J4DgFjCU6gqL43"
+    }
+  ],
+  "absences": [
+    {
+      "id": "1f9f8b63-46b2-4b9d-8dd7-572e53cbf544",
+      "from": "2026-01-27",
+      "to": "2026-01-27",
+      "doctorId": "wK87VRXlNkdhE4J4DgFjCU6gqL43"
+    }
+  ],
+  "reviews": [
+    {
+      "patientId": "YWrMEgeIX4TKTQL7Gy5qhgYqEuq1",
+      "patientEmail": "pacjent@test.pl",
+      "rating": 5,
+      "text": "gitara",
+      "date": "2026-01-25T15:37:08.779Z",
+      "doctorId": "wK87VRXlNkdhE4J4DgFjCU6gqL43",
+      "id": 1
+    },
+    {
+      "patientId": "YWrMEgeIX4TKTQL7Gy5qhgYqEuq1",
+      "patientEmail": "pacjent@test.pl",
+      "rating": 4,
+      "text": "może być",
+      "date": "2026-01-25T16:37:13.680Z",
+      "doctorId": "CpaXLslf6wgf0RWS3hJc7okfVB32",
+      "id": 2
+    }
+  ],
+  "notifications": []
 }

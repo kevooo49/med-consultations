@@ -126,7 +126,7 @@ export function EventBlock({
             className={clsx("tooltip", showBelow && "tooltipBelow")} 
             style={{
                 zIndex: 100, 
-                // WAŻNE: Odblokowujemy klikanie w linki wewnątrz tooltipa
+                // Odblokowujemy klikanie w linki wewnątrz tooltipa
                 pointerEvents: 'auto' 
             }}
           >

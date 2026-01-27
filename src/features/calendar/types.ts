@@ -64,7 +64,7 @@ export interface AppUser {
   city?: string;
   specialization?: string;
   avatarUrl?: string;
-
+  createdAt?: string;
   averageRating?: number;
   reviewsCount?: number;
 }

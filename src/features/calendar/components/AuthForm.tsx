@@ -36,7 +36,7 @@ export function AuthForm() {
         setPass("");
       }
     } catch (err: any) {
-      // Tłumaczenie popularnych błędów Firebase na polski
+      // tłumaczenie błędów Firebase na polski
       if (err.code === 'auth/email-already-in-use') {
         setError("Ten email jest już zajęty.");
       } else if (err.code === 'auth/weak-password') {

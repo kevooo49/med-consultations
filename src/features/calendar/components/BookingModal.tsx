@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { format } from "date-fns";
 import type { Consultation } from "../types";
 import { calculatePrice } from "../utils/pricing";
-import { Link as LinkIcon } from "lucide-react"; // Dodano ikonę
+import { Link as LinkIcon } from "lucide-react";
 
 export type ConsultationType =
   | "first_visit"
@@ -36,7 +36,7 @@ export function BookingModal({ day, startSlot, endSlot, onClose, onSave }: Props
   const [age, setAge] = useState<string>(""); 
   const [notes, setNotes] = useState("");
   
-  // ZMIANA: Zamiast plików, przechowujemy link (string)
+  // Zamiast plików, przechowujemy link
   const [docLink, setDocLink] = useState("");
   
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -62,7 +62,7 @@ export function BookingModal({ day, startSlot, endSlot, onClose, onSave }: Props
     gender !== "" ||
     age !== "" ||
     notes.trim() !== "" ||
-    docLink.trim() !== ""; // ZMIANA
+    docLink.trim() !== "";
 
   function handleCloseRequest() {
     if (!isDirty) {
@@ -111,21 +111,21 @@ export function BookingModal({ day, startSlot, endSlot, onClose, onSave }: Props
     const safeGender = gender as NonNullable<Consultation["patient"]>["gender"];
     const price = calculatePrice(durationMin);
 
-    // ZMIANA: Tworzenie tablicy dokumentów z linku
+    // Tworzenie tablicy dokumentów z linku
     const documents = docLink 
       ? [{ name: "Dokumentacja zewnętrzna (Link)", url: docLink }] 
       : [];
 
     const consultation: Consultation = {
       id: crypto.randomUUID(),
-      doctorId: "d1", // To zostanie nadpisane w App.tsx dynamicznym ID
+      doctorId: "d1",
       start: from.toISOString(),
       end: to.toISOString(),
       type: safeType,
       status: "draft",
       price,
       patient: {
-        fullName, // To pole musi zostać zachowane!
+        fullName,
         gender: safeGender,
         age: Number(age),
       },
@@ -223,7 +223,6 @@ export function BookingModal({ day, startSlot, endSlot, onClose, onSave }: Props
             />
           </label>
 
-          {/* ZMIANA: Pole na link zamiast pliku */}
           <label>
             Dokumenty (Link do chmury)
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

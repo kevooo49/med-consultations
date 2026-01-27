@@ -1,30 +1,34 @@
 import { useEffect, useState } from "react";
-import { listenToMyNotifications, dismissNotification, type AppNotification } from "../../../services/notificationService";
 import { useAuth } from "../../../context/AuthContext";
 import { X, Bell, AlertTriangle } from "lucide-react";
+import type { Backend, AppNotification } from "../../../services/backend";
 
-export function NotificationToast() {
+interface Props {
+  backend: Backend;
+}
+
+export function NotificationToast({ backend }: Props) {
   const { user } = useAuth();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
 
   useEffect(() => {
     if (!user) return;
     
-    const unsubscribe = listenToMyNotifications(user.uid, (data) => {
+    const unsubscribe = backend.listenNotifications(user.uid, (data) => {
       setNotifications(data);
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user, backend]);
 
   const handleDismiss = async (id: string) => {
     if (!user) return;
-    await dismissNotification(user.uid, id);
+    await backend.dismissNotification(user.uid, id);
   };
 
   if (notifications.length === 0) return null;
 
-  // Wyświetlamy max 3 powiadomienia na raz, żeby nie zatkać ekranu
+  // Wyświetlamy max 3 powiadomienia na raz
   const visibleNotifications = notifications.slice(0, 3);
 
   return (
