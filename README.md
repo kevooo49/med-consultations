@@ -44,9 +44,9 @@ Zaimplementowany system powiadomień typu *Toast*. Pacjenci są natychmiastowo p
 
 ## 📸 Zrzuty ekranu
 
-![Widok główny](./public/Zrzut ekranu 2026-02-19 193853.png)
+![Widok główny](https://github.com/kevooo49/med-consultations/blob/main/public/Zrzut%20ekranu%202026-02-19%20193853.png)
 
-![Widok kalendarza](./public/Zrzut ekranu 2026-02-19 194038.png)
+![Widok kalendarza](https://github.com/kevooo49/med-consultations/blob/main/public/Zrzut%20ekranu%202026-02-19%20194038.png)
 
 ---
 
