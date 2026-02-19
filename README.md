@@ -1,73 +1,102 @@
-# React + TypeScript + Vite
+# 🏥 System Rezerwacji Medycznych (Medical Booking Portal)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
+![Firebase](https://img.shields.io/badge/firebase-ffca28?style=for-the-badge&logo=firebase&logoColor=black)
 
-Currently, two official plugins are available:
+Zaawansowana aplikacja internetowa (Single Page Application) do zarządzania wizytami lekarskimi, grafikami pracy oraz opiniami pacjentów. Projekt demonstruje implementację skomplikowanej logiki biznesowej (obsługa konfliktów czasowych w kalendarzu) oraz elastycznej architektury front-endu opartej na wzorcach projektowych.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## ✨ Główne funkcjonalności
 
-## React Compiler
+### 🔒 Role-Based Access Control (RBAC)
+System obsługuje trzy niezależne typy kont z oddzielnymi ścieżkami (routing) i uprawnieniami:
+* **Pacjent:** Przeglądanie listy lekarzy, interaktywna rezerwacja wizyt (mechanizm koszyka wizyt: status *draft* -> *booked*), wystawianie opinii (zabezpieczone wymogiem odbytej wizyty) oraz odbieranie powiadomień.
+* **Lekarz:** Dedykowany widok kalendarza, zarządzanie dostępnością (godziny pracy), wprowadzanie urlopów (z automatycznym odwoływaniem kolidujących wizyt) oraz masowa wysyłka powiadomień do swoich pacjentów.
+* **Admin:** Zarządzanie użytkownikami (banowanie), moderacja systemu opinii, zakładanie zaufanych kont lekarskich oraz globalna konfiguracja trybu persystencji sesji w przeglądarce.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### 📅 Autorski Kalendarz Wizyt
+Zamiast korzystać z gotowych bibliotek UI, kalendarz i siatka godzin zostały zbudowane od podstaw:
+* Dynamiczna siatka czasu skalowana w czasie rzeczywistym (1 minuta = 2 piksele).
+* Zaznaczanie przedziałów czasowych metodą Drag & Drop.
+* Zaawansowana walidacja w locie: blokada tworzenia rezerwacji nakładających się na inne wizyty ("mosty"), blokada rezerwacji poza godzinami pracy lekarza oraz w czasie jego urlopu.
+* Dynamiczny wskaźnik aktualnego czasu ("Teraz").
 
-## Expanding the ESLint configuration
+### 🔄 Architektura Hybrydowa (Strategy Pattern)
+Warstwa dostępu do danych została wyabstrahowana za pomocą interfejsu. Pozwala to na **dynamiczne przełączanie bazy danych w locie** bez zmiany logiki biznesowej aplikacji. Obsługiwane strategie to:
+1. **Firebase Realtime Database:** Komunikacja natywna z wykorzystaniem protokołu WebSockets.
+2. **Local JSON Server (REST API):** Implementacja wzorca *Event Bus* (Observer), symulująca reaktywność i odświeżanie danych w czasie rzeczywistym na standardowym protokole HTTP.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### 🔔 Powiadomienia Real-Time
+Zaimplementowany system powiadomień typu *Toast*. Pacjenci są natychmiastowo powiadamiani o zmianach w grafiku lekarza, anulowanych wizytach czy ogłoszeniach, bez konieczności odświeżania strony.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+---
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## 🛠️ Stack Technologiczny
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+* **Frontend:** React 18, TypeScript
+* **Routing & Ochrona widoków:** React Router DOM
+* **Manipulacja czasem:** `date-fns`
+* **Stylizacja:** CSS3 (Custom Grids, Absolute Positioning), `clsx`, Lucide React (ikony)
+* **BaaS & Autoryzacja:** Firebase (Authentication, Realtime Database)
+* **Mock API:** `json-server`
+
+---
+
+## 📸 Zrzuty ekranu
+
+![Widok główny](./public/Zrzut ekranu 2026-02-19 193853.png)
+
+![Widok kalendarza](./public/Zrzut ekranu 2026-02-19 194038.png)
+
+---
+
+## 🚀 Jak uruchomić projekt lokalnie?
+
+### Wymagania wstępne
+* Node.js (v16+)
+* Menedżer pakietów (NPM lub Yarn)
+
+### Instalacja
+
+**1. Sklonuj repozytorium**
+```bash
+git clone [https://github.com/TwojLogin/nazwa-repozytorium.git](https://github.com/TwojLogin/nazwa-repozytorium.git)
+cd nazwa-repozytorium
+
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+**2. Zainstaluj zależności**
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+```bash
+npm install
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```
+
+**3. Uruchomienie Mock API (Local JSON Server)**
+Aby przetestować działanie w trybie lokalnym, uruchom serwer API w osobnej karcie terminala:
+
+```bash
+npx json-server --watch db.json --port 3001
+
+```
+
+**4. Uruchomienie aplikacji React**
+
+```bash
+npm start
+
+```
+
+Aplikacja będzie dostępna pod adresem `http://localhost:3000`.
+
+---
+
+## 👤 Autor
+
+**Kevin Stuka**
+
+* GitHub: [@Kevooo49](https://www.google.com/search?q=https://github.com/kevooo49)
+
+```
+
 ```
